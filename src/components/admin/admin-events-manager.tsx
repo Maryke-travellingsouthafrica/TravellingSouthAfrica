@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import Image from 'next/image';
 import { Trash2, Edit2, Loader2, ChevronsUpDown, Check, Calendar as CalendarIcon, MapPin } from 'lucide-react';
 import { createEvent, getAllEvents, updateEvent, deleteEvent, type EventDoc } from '@/services/eventsService';
+import { formatEventDateRange, getEventEnd, getEventStart } from '@/lib/events';
 import { deleteEventImage } from '@/services/storageService';
 import { towns as allTownsData } from '@/lib/data/towns';
 import { provinces } from '@/lib/data/provinces';
@@ -23,7 +24,8 @@ import { provinces } from '@/lib/data/provinces';
 interface FormData {
   title: string;
   description: string;
-  eventDate: string; // yyyy-MM-dd, native date input format
+  startDate: string; // yyyy-MM-dd, native date input format
+  endDate: string; // same as startDate for a single-day event
   townSlug: string;
   imageUrl: string;
 }
@@ -31,7 +33,8 @@ interface FormData {
 const initialFormData: FormData = {
   title: '',
   description: '',
-  eventDate: '',
+  startDate: '',
+  endDate: '',
   townSlug: '',
   imageUrl: '',
 };
@@ -80,11 +83,23 @@ export function AdminEventsManager() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || !formData.description || !formData.eventDate) {
+    if (!formData.title || !formData.description || !formData.startDate) {
       toast({
         variant: 'destructive',
         title: 'Validation error',
-        description: 'Please fill in the title, description, and event date',
+        description: 'Please fill in the title, description, and start date',
+      });
+      return;
+    }
+
+    // A blank end date means a single-day event.
+    const endDateValue = formData.endDate || formData.startDate;
+
+    if (endDateValue < formData.startDate) {
+      toast({
+        variant: 'destructive',
+        title: 'Validation error',
+        description: 'The end date cannot be before the start date',
       });
       return;
     }
@@ -95,7 +110,8 @@ export function AdminEventsManager() {
       const eventPayload = {
         title: formData.title,
         description: formData.description,
-        eventDate: new Date(`${formData.eventDate}T00:00:00`),
+        startDate: new Date(`${formData.startDate}T00:00:00`),
+        endDate: new Date(`${endDateValue}T00:00:00`),
         ...(formData.townSlug ? { townSlug: formData.townSlug } : {}),
         ...(formData.imageUrl ? { imageUrl: formData.imageUrl } : {}),
       };
@@ -125,11 +141,17 @@ export function AdminEventsManager() {
   };
 
   const handleEdit = (event: EventDoc) => {
+    // Legacy docs may still carry only the old single `eventDate` field; the
+    // helpers fall back to it so those can be edited into a proper range.
+    const startDate = getEventStart(event);
+    const endDate = getEventEnd(event);
+
     setEditingEvent(event);
     setFormData({
       title: event.title,
       description: event.description,
-      eventDate: format(event.eventDate.toDate(), 'yyyy-MM-dd'),
+      startDate: startDate ? format(startDate, 'yyyy-MM-dd') : '',
+      endDate: endDate ? format(endDate, 'yyyy-MM-dd') : '',
       townSlug: event.townSlug || '',
       imageUrl: event.imageUrl || '',
     });
@@ -206,16 +228,40 @@ export function AdminEventsManager() {
                 />
               </div>
 
-              {/* Event Date */}
-              <div className="space-y-2">
-                <Label htmlFor="event-date">Event Date *</Label>
-                <Input
-                  id="event-date"
-                  type="date"
-                  value={formData.eventDate}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, eventDate: e.target.value }))}
-                  required
-                />
+              {/* Event Dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="event-start-date">Start Date *</Label>
+                  <Input
+                    id="event-start-date"
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        startDate: e.target.value,
+                        // Keep a single-day event single-day, and never leave the
+                        // end date stranded before the new start date.
+                        endDate: !prev.endDate || prev.endDate < e.target.value ? e.target.value : prev.endDate,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="event-end-date">End Date *</Label>
+                  <Input
+                    id="event-end-date"
+                    type="date"
+                    min={formData.startDate || undefined}
+                    value={formData.endDate}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, endDate: e.target.value }))}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Same as the start date for a one-day event.
+                  </p>
+                </div>
               </div>
 
               {/* Town (optional) */}
@@ -347,7 +393,7 @@ export function AdminEventsManager() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <CalendarIcon className="h-3 w-3" />
-                        {format(event.eventDate.toDate(), 'MMM d, yyyy')}
+                        {formatEventDateRange(event) || 'No date set'}
                       </span>
                       {event.townSlug && (
                         <span className="flex items-center gap-1">

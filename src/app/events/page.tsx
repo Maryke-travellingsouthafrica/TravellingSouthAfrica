@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Translatable } from '@/components/translatable';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 import { towns } from '@/lib/data/towns';
+import { formatEventDateRange, getEventStart, slugifyEventTitle, type TimestampLike } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +18,8 @@ interface EventItem {
   id: string;
   title: string;
   description: string;
-  eventDate: Timestamp;
+  startDate: TimestampLike;
+  endDate: TimestampLike;
   townSlug?: string;
   imageUrl?: string;
 }
@@ -54,33 +57,31 @@ async function getUpcomingEvents(): Promise<EventItem[]> {
     const firestore = getFirestore(app);
     const eventsRef = collection(firestore, 'events');
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const q = query(eventsRef, where('eventDate', '>=', Timestamp.fromDate(startOfToday)), orderBy('eventDate', 'asc'));
+    // Anything whose end date is still ahead of us is live; events drop off the
+    // listing on their own the moment endDate passes, with no cron job.
+    // Firestore requires the inequality field to lead the ordering, so the list
+    // is re-sorted by start date below.
+    const q = query(
+      eventsRef,
+      where('endDate', '>=', Timestamp.now()),
+      orderBy('endDate', 'asc'),
+      orderBy('startDate', 'asc')
+    );
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => {
+    const events = snapshot.docs.map((doc) => {
       const data = doc.data();
       const plainObject = JSON.parse(JSON.stringify(data));
       return { id: doc.id, ...plainObject } as EventItem;
     });
+
+    return events.sort(
+      (a, b) => (getEventStart(a)?.getTime() ?? Infinity) - (getEventStart(b)?.getTime() ?? Infinity)
+    );
   } catch (error) {
     console.error('Error fetching upcoming events:', error);
     return [];
   }
-}
-
-function formatEventDate(eventDate: any) {
-  // Server-serialized Timestamp comes through as { seconds, nanoseconds } after
-  // the JSON round-trip above, same shape blog posts already use for their date field.
-  const seconds = eventDate?.seconds ?? eventDate?._seconds;
-  if (typeof seconds !== 'number') return null;
-  return new Date(seconds * 1000).toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
 }
 
 export default async function EventsPage() {
@@ -107,40 +108,42 @@ export default async function EventsPage() {
           {events.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
               {events.map((event) => {
-                const formattedDate = formatEventDate(event.eventDate);
+                const formattedDate = formatEventDateRange(event);
                 const townName = event.townSlug ? townNameMap.get(event.townSlug) || event.townSlug : null;
 
                 return (
-                  <Card key={event.id} className="group overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1 h-full">
-                    <div className="relative h-64 w-full overflow-hidden bg-muted">
-                      <ImageWithFallback
-                        src={event.imageUrl}
-                        alt={event.title}
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <div className="absolute bottom-0 left-0 w-full p-4 text-white">
-                        <h2 className="font-headline text-xl font-bold"><Translatable text={event.title} /></h2>
-                        {formattedDate && (
-                          <p className="flex items-center mt-1 text-sm">
-                            <CalendarDays className="w-4 h-4 mr-1" />
-                            {formattedDate}
-                          </p>
-                        )}
-                        {townName && (
-                          <p className="flex items-center mt-1 text-sm">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            <Translatable text={townName} />
-                          </p>
-                        )}
+                  <Link href={`/events/${slugifyEventTitle(event.title)}`} key={event.id}>
+                    <Card className="group overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1 h-full">
+                      <div className="relative h-64 w-full overflow-hidden bg-muted">
+                        <ImageWithFallback
+                          src={event.imageUrl}
+                          alt={event.title}
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        <div className="absolute bottom-0 left-0 w-full p-4 text-white">
+                          <h2 className="font-headline text-xl font-bold"><Translatable text={event.title} /></h2>
+                          {formattedDate && (
+                            <p className="flex items-center mt-1 text-sm">
+                              <CalendarDays className="w-4 h-4 mr-1" />
+                              {formattedDate}
+                            </p>
+                          )}
+                          {townName && (
+                            <p className="flex items-center mt-1 text-sm">
+                              <MapPin className="w-4 h-4 mr-1" />
+                              <Translatable text={townName} />
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-4">
-                      <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
-                    </div>
-                  </Card>
+                      <div className="p-4">
+                        <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
+                      </div>
+                    </Card>
+                  </Link>
                 );
               })}
             </div>
