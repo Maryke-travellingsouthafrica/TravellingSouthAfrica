@@ -1,5 +1,6 @@
 import { provinces } from '@/lib/data/provinces';
 import { towns as allTowns } from '@/lib/data/towns';
+import { MAJOR_TOWNS } from '@/lib/data/major-towns';
 import { sights as allSights } from '@/lib/data/sights';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -69,7 +70,19 @@ export default async function ProvinceDetailPage(props: { params: Promise<{ slug
     notFound();
   }
 
-  const provinceTowns = allTowns.filter(t => t.provinceSlug === province.slug).slice(0, 10);
+  const curatedSlugs = MAJOR_TOWNS[province.slug];
+  const provinceTowns = curatedSlugs
+    ? curatedSlugs
+        .map((slug) => {
+          const town = allTowns.find(t => t.slug === slug && t.provinceSlug === province.slug);
+          if (!town && process.env.NODE_ENV !== 'production') {
+            console.warn(`MAJOR_TOWNS['${province.slug}']: town slug "${slug}" not found in towns.ts — skipping`);
+          }
+          return town;
+        })
+        .filter((t): t is typeof allTowns[number] => Boolean(t))
+        .slice(0, 10)
+    : allTowns.filter(t => t.provinceSlug === province.slug).slice(0, 10);
   const provinceSights = allSights.filter(s => s.provinceSlug === province.slug).slice(0, 5);
   const townPhotos = await fetchTownPhotoMap(getServerFirestore());
 
