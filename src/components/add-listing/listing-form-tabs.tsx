@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { User } from 'firebase/auth';
 import Image from 'next/image';
-import Link from 'next/link';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -20,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Translatable } from '@/components/translatable';
+import { ListingTerms, ListingTermsAgreement, ListingTermsTrialNote } from '@/components/listing-terms';
 import { useToast } from '@/hooks/use-toast';
 import { towns } from '@/lib/data/towns';
 import { Camera, CheckCircle, ChevronsUpDown, Check } from 'lucide-react';
@@ -33,7 +33,6 @@ import { serviceCategories } from '@/lib/service-categories';
 
 interface ListingFormTabsProps {
   user: User;
-  isAdmin: boolean;
 }
 
 const accommodationSchema = z.object({
@@ -46,9 +45,6 @@ const accommodationSchema = z.object({
   contactEmail: z.string().email(),
   contactPhone: z.string().min(1, 'Phone number is required'),
   description: z.string().min(1, 'Description is required').max(500),
-  terms: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the listing fee." }),
-  }),
   termsAndConditions: z.literal(true, {
     errorMap: () => ({ message: "You must agree to the Terms & Conditions." }),
   }),
@@ -63,9 +59,6 @@ const serviceProviderSchema = z.object({
   contactEmail: z.string().email(),
   contactPhone: z.string().min(1, 'Phone number is required'),
   description: z.string().min(1, 'Description is required').max(500),
-  terms: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the listing fee." }),
-  }),
   termsAndConditions: z.literal(true, {
     errorMap: () => ({ message: "You must agree to the Terms & Conditions." }),
   }),
@@ -79,9 +72,6 @@ const attractionSchema = z.object({
   websiteUrl: z.string().url().optional().or(z.literal('')),
   contactEmail: z.string().email().optional().or(z.literal('')),
   description: z.string().min(1, 'Description is required').max(500),
-  terms: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the listing fee." }),
-  }),
   termsAndConditions: z.literal(true, {
     errorMap: () => ({ message: "You must agree to the Terms & Conditions." }),
   }),
@@ -92,7 +82,7 @@ type FormSchema = z.infer<typeof accommodationSchema> | z.infer<typeof servicePr
 const accommodationCategories = ['Hotel', 'Guesthouse', 'Self-Catering', 'B&B', 'Lodge', 'Backpackers', 'Other'];
 const attractionCategories = ['Nature', 'Culture', 'Adventure', 'Historical', 'Other'];
 
-export function ListingFormTabs({ user, isAdmin }: ListingFormTabsProps) {
+export function ListingFormTabs({ user }: ListingFormTabsProps) {
   return (
     <Tabs defaultValue="accommodation" className="w-full">
       <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 h-auto">
@@ -101,7 +91,7 @@ export function ListingFormTabs({ user, isAdmin }: ListingFormTabsProps) {
         <TabsTrigger value="attraction"><Translatable text="Attraction/Sight" /></TabsTrigger>
       </TabsList>
       <TabsContent value="accommodation">
-        <ListingForm key="accommodation" user={user} isAdmin={isAdmin} collectionName="accommodations" formSchema={accommodationSchema} title="Accommodation" description="List your hotel, guesthouse, B&B, or other accommodation."
+        <ListingForm key="accommodation" user={user} collectionName="accommodations" formSchema={accommodationSchema} title="Accommodation" description="List your hotel, guesthouse, B&B, or other accommodation."
           fields={[
             { name: 'name', label: 'Accommodation Name', type: 'text' },
             { name: 'townSlug', label: 'Town', type: 'combobox' },
@@ -116,7 +106,7 @@ export function ListingFormTabs({ user, isAdmin }: ListingFormTabsProps) {
         />
       </TabsContent>
       <TabsContent value="service">
-        <ListingForm key="service" user={user} isAdmin={isAdmin} collectionName="service_providers" formSchema={serviceProviderSchema} title="Service Provider" description="List your restaurant, tour, car rental, guide, or other travel service."
+        <ListingForm key="service" user={user} collectionName="service_providers" formSchema={serviceProviderSchema} title="Service Provider" description="List your restaurant, tour, car rental, guide, or other travel service."
           fields={[
             { name: 'name', label: 'Service Name', type: 'text' },
             { name: 'townSlug', label: 'Town', type: 'combobox' },
@@ -130,7 +120,7 @@ export function ListingFormTabs({ user, isAdmin }: ListingFormTabsProps) {
         />
       </TabsContent>
       <TabsContent value="attraction">
-        <ListingForm key="attraction" user={user} isAdmin={isAdmin} collectionName="attractions" formSchema={attractionSchema} title="Attraction / Sight" description="Add a must-see attraction or point of interest."
+        <ListingForm key="attraction" user={user} collectionName="attractions" formSchema={attractionSchema} title="Attraction / Sight" description="Add a must-see attraction or point of interest."
           fields={[
             { name: 'name', label: 'Attraction Name', type: 'text' },
             { name: 'townSlug', label: 'Nearest Town', type: 'combobox' },
@@ -162,10 +152,9 @@ interface ListingFormProps {
   title: string;
   description: string;
   fields: FieldConfig[];
-  isAdmin: boolean;
 }
 
-function ListingForm({ user, collectionName, formSchema, title, description, fields, isAdmin }: ListingFormProps) {
+function ListingForm({ user, collectionName, formSchema, title, description, fields }: ListingFormProps) {
   const firestore = useFirestore();
   const storage = useStorage();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -180,18 +169,14 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
     defaultValues: {
       ...fields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}),
       contactEmail: user.email || '',
-      terms: false,
       termsAndConditions: false,
     },
     mode: 'onChange',
   });
 
   useEffect(() => {
-    if (isAdmin) {
-      form.setValue('terms', true);
-    }
     form.setValue('contactEmail', user.email || '');
-  }, [isAdmin, user.email, form]);
+  }, [user.email, form]);
 
   const provinceMap = useMemo(() => new Map(provinces.map(p => [p.slug, p.name])), []);
   const townsWithProvince = useMemo(() => towns.map(town => ({
@@ -233,7 +218,6 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
            createdAt: serverTimestamp(),
            status: 'pending',
         };
-        delete (docData as any).terms;
         delete (docData as any).termsAndConditions;
         
         await addDoc(collection(firestore, submissionCollectionName), docData);
@@ -377,29 +361,7 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
               )}
             </div>
 
-            {!isAdmin && (
-              <div className="space-y-4 rounded-lg border bg-secondary p-4">
-                <p className="text-sm italic text-muted-foreground">
-                  <Translatable text="By submitting this listing, you agree to a non-refundable annual fee of R350 per year. This fee covers your listing on Travelling South Africa and is payable upon approval. You will be invoiced after review and acceptance of your submission." />
-                </p>
-                <FormField control={form.control} name="terms" render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-3 pt-2">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel><Translatable text="I understand and agree to the R350 annual listing fee upon approval" /></FormLabel>
-                      <FormMessage />
-                    </div>
-                  </FormItem>
-                )} />
-              </div>
-            )}
-
-            <div className="space-y-4 rounded-lg border bg-secondary p-4">
-              <p className="text-sm text-muted-foreground">
-                <Translatable text="Travelling South Africa reserves the right to decline any listing application if it is found not reputable or possibly harmful. Travelling South Africa does not bear any responsibility for any transactions made between guests/users and clients/advertisers." />
-              </p>
+            <ListingTerms>
               <FormField control={form.control} name="termsAndConditions" render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 pt-2">
                   <FormControl>
@@ -407,25 +369,14 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>
-                      <Translatable text="I have read and agree to the " />
-                      <Link
-                        href="/business-listing-terms"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-primary"
-                      >
-                        <Translatable text="Business Listing Terms & Conditions" />
-                      </Link>
-                      <Translatable text="." />
+                      <ListingTermsAgreement />
                     </FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      <Translatable text="60-day free trial — no payment required. Before your trial ends, we'll contact you to see if you'd like to continue. If you choose to continue, the annual listing fee is R350." />
-                    </p>
+                    <ListingTermsTrialNote />
                     <FormMessage />
                   </div>
                 </FormItem>
               )} />
-            </div>
+            </ListingTerms>
 
             <Button type="submit" disabled={isSubmitting || !form.formState.isValid} className="w-full" size="lg">
               {isSubmitting ? <Translatable text="Submitting..." /> : <Translatable text="Submit for Approval" />}

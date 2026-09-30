@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Translatable } from '@/components/translatable';
+import { ListingTerms, ListingTermsAgreement, ListingTermsTrialNote } from '@/components/listing-terms';
 import { Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { addListing } from '@/firebase/firestore/listings';
@@ -101,7 +102,7 @@ export function ListYourAccommodationForm() {
                             <Translatable text="List Your Accommodation" />
                         </CardTitle>
                         <CardDescription className="text-lg text-muted-foreground max-w-3xl mx-auto mt-2">
-                            <Translatable text="Own a hotel, guesthouse, or B&B? Get featured to tourists booking private tours. The annual listing fee is R350, payable only after approval." />
+                            <Translatable text="Own a hotel, guesthouse, or B&B? Get featured to tourists booking private tours. Start with a 60-day free trial — no payment required." />
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="p-8 pt-0">
@@ -191,23 +192,23 @@ export function ListYourAccommodationForm() {
                                 )}
                             </div>
 
-                            <div className="flex items-start space-x-2">
-                                <Checkbox id="terms" required />
-                                <div className="grid gap-1.5 leading-none">
-                                    <Label htmlFor="terms" className="text-sm font-medium">
-                                        <Translatable text="I agree to the terms and conditions." />
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        <Translatable text="I confirm the information is accurate and agree to the R350 annual listing fee, payable upon approval." />
-                                    </p>
+                            <ListingTerms>
+                                <div className="flex flex-row items-start space-x-3 pt-2">
+                                    <Checkbox id="terms" required className="mt-1" />
+                                    <div className="space-y-1 leading-none">
+                                        <Label htmlFor="terms">
+                                            <ListingTermsAgreement />
+                                        </Label>
+                                        <ListingTermsTrialNote />
+                                    </div>
                                 </div>
-                            </div>
+                            </ListingTerms>
 
                             <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
                                 {isSubmitting ? <Translatable text="Submitting..." /> : <Translatable text="Submit Your Listing for Review" />}
                             </Button>
                             <p className="text-xs text-muted-foreground text-center pt-4">
-                                <Translatable text="Submissions are reviewed within 2–3 business days. We'll email payment instructions if your listing is approved." />
+                                <Translatable text="Submissions are reviewed within 2–3 business days." />
                             </p>
                         </form>
                     </CardContent>
