@@ -17,6 +17,14 @@ import { useToast } from "@/hooks/use-toast";
 import Logo from "@/components/logo";
 import { Eye, EyeOff } from "lucide-react";
 
+// Where to send the user after login: the same-site path in ?redirect= if
+// one was given (e.g. from a "Login Required" card), otherwise the dashboard.
+function getPostLoginPath() {
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  const isSameSitePath = !!redirect && redirect.startsWith("/") && !redirect.startsWith("//") && !redirect.startsWith("/\\");
+  return isSameSitePath ? redirect : "/dashboard";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +44,7 @@ export default function LoginPage() {
         description: error.message,
       });
     } else {
-      router.push("/dashboard");
+      router.push(getPostLoginPath());
     }
   };
   
@@ -49,7 +57,7 @@ export default function LoginPage() {
             description: error.message,
         });
     } else {
-        router.push('/dashboard');
+        router.push(getPostLoginPath());
     }
   };
 

@@ -12,6 +12,7 @@ import { approveListing, unapproveListing, deleteListingSubmission } from '@/fir
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
+import { z } from 'zod';
 import Image from 'next/image';
 import { ChevronDown, ChevronUp, Mail, Phone, Globe, MapPin, Tag, User, ExternalLink, ChevronLeft, ChevronRight, Settings, Trash2, Plus, Loader2 } from 'lucide-react';
 
@@ -97,15 +98,25 @@ function ManageListingDialog({
   const [physicalAddress, setPhysicalAddress] = useState(listing.physicalAddress || '');
   const [contactPhone, setContactPhone] = useState(listing.contactPhone || '');
   const [contactEmail, setContactEmail] = useState(listing.contactEmail || '');
+  const [contactEmailError, setContactEmailError] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState(listing.websiteUrl || '');
   const [bookingSiteUrl, setBookingSiteUrl] = useState(listing.bookingSiteUrl || '');
   const [imageUrls, setImageUrls] = useState<string[]>(listing.imageUrls || []);
 
   const handleSave = async () => {
+    const trimmedEmail = contactEmail.trim();
+    if (trimmedEmail && !z.string().email().safeParse(trimmedEmail).success) {
+      setContactEmailError('Please enter a valid email address');
+      return;
+    }
     setIsSaving(true);
     try {
-      const docRef = doc(firestore, `${collectionName}_submissions`, listing.id);
-      await updateDoc(docRef, { physicalAddress, contactPhone, contactEmail, websiteUrl, bookingSiteUrl, imageUrls });
+      const updates = { physicalAddress, contactPhone, contactEmail: trimmedEmail, websiteUrl, bookingSiteUrl, imageUrls };
+      await updateDoc(doc(firestore, `${collectionName}_submissions`, listing.id), updates);
+      // An approved listing also has a public copy (same id); keep it in sync so edits go live.
+      if (listing.status === 'approved') {
+        await updateDoc(doc(firestore, collectionName, listing.id), updates);
+      }
       toast({ title: 'Listing updated successfully' });
       onClose();
     } catch (error: any) {
@@ -161,7 +172,8 @@ function ManageListingDialog({
               </div>
               <div className="space-y-1">
                 <Label>Contact Email</Label>
-                <Input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="email@example.com" />
+                <Input type="email" value={contactEmail} onChange={e => { setContactEmail(e.target.value); setContactEmailError(''); }} placeholder="email@example.com" />
+                {contactEmailError && <p className="text-sm font-medium text-destructive">{contactEmailError}</p>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
