@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ChangeEvent, useEffect, useMemo } from 'react';
+import { useState, type ChangeEvent, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Translatable } from '@/components/translatable';
 import { ListingTerms, ListingTermsAgreement, ListingTermsTrialNote } from '@/components/listing-terms';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +42,7 @@ const accommodationSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   websiteUrl: z.string().url().optional().or(z.literal('')),
   bookingSiteUrl: z.string().url().optional().or(z.literal('')),
-  contactEmail: z.string().email(),
+  contactEmail: z.string().min(1, 'Contact email is required').email('Please enter a valid email address'),
   contactPhone: z.string().min(1, 'Phone number is required'),
   description: z.string().min(1, 'Description is required').max(500),
   termsAndConditions: z.literal(true, {
@@ -56,7 +56,7 @@ const serviceProviderSchema = z.object({
   physicalAddress: z.string().optional().or(z.literal('')),
   category: z.string().min(1, 'Category is required'),
   websiteUrl: z.string().url().optional().or(z.literal('')),
-  contactEmail: z.string().email(),
+  contactEmail: z.string().min(1, 'Contact email is required').email('Please enter a valid email address'),
   contactPhone: z.string().min(1, 'Phone number is required'),
   description: z.string().min(1, 'Description is required').max(500),
   termsAndConditions: z.literal(true, {
@@ -70,7 +70,7 @@ const attractionSchema = z.object({
   physicalAddress: z.string().optional().or(z.literal('')),
   category: z.string().min(1, 'Category is required'),
   websiteUrl: z.string().url().optional().or(z.literal('')),
-  contactEmail: z.string().email().optional().or(z.literal('')),
+  contactEmail: z.string().email('Please enter a valid email address').optional().or(z.literal('')),
   description: z.string().min(1, 'Description is required').max(500),
   termsAndConditions: z.literal(true, {
     errorMap: () => ({ message: "You must agree to the Terms & Conditions." }),
@@ -78,6 +78,13 @@ const attractionSchema = z.object({
 });
 
 type FormSchema = z.infer<typeof accommodationSchema> | z.infer<typeof serviceProviderSchema> | z.infer<typeof attractionSchema>;
+
+// Contact Email is the public address shown on the listing, typed in by hand.
+// It is deliberately not taken from the logged-in account (see ownerEmail).
+const contactEmailField = {
+  placeholder: 'Business contact email',
+  helperText: 'This email will be shown publicly on the listing for customer enquiries.',
+};
 
 const accommodationCategories = ['Hotel', 'Guesthouse', 'Self-Catering', 'B&B', 'Lodge', 'Backpackers', 'Other'];
 const attractionCategories = ['Nature', 'Culture', 'Adventure', 'Historical', 'Other'];
@@ -91,19 +98,7 @@ export function ListingFormTabs({ user }: ListingFormTabsProps) {
         <TabsTrigger value="attraction"><Translatable text="Attraction/Sight" /></TabsTrigger>
       </TabsList>
       <TabsContent value="accommodation">
-        <ListingForm key="accommodation" user={user} collectionName="accommodations" formSchema={accommodationSchema} title="Accommodation" description="List your hotel, guesthouse, B&B, or other accommodation."
-          fields={[
-            { name: 'name', label: 'Accommodation Name', type: 'text' },
-            { name: 'townSlug', label: 'Town', type: 'combobox' },
-            { name: 'physicalAddress', label: 'Physical Address (optional)', type: 'textarea', optional: true, placeholder: "Enter the full physical address" },
-            { name: 'category', label: 'Category', type: 'select', options: accommodationCategories.map(c => ({ value: c, label: c })) },
-            { name: 'websiteUrl', label: 'Website URL', type: 'url', optional: true },
-            { name: 'bookingSiteUrl', label: 'Booking Site URL', type: 'url', optional: true },
-            { name: 'contactEmail', label: 'Contact Email', type: 'email' },
-            { name: 'contactPhone', label: 'Contact Phone', type: 'tel' },
-            { name: 'description', label: 'Description', type: 'textarea' },
-          ]}
-        />
+        <AccommodationListingForm key="accommodation" user={user} />
       </TabsContent>
       <TabsContent value="service">
         <ListingForm key="service" user={user} collectionName="service_providers" formSchema={serviceProviderSchema} title="Service Provider" description="List your restaurant, tour, car rental, guide, or other travel service."
@@ -113,7 +108,7 @@ export function ListingFormTabs({ user }: ListingFormTabsProps) {
             { name: 'physicalAddress', label: 'Physical Address (optional)', type: 'textarea', optional: true, placeholder: "Enter the full physical address" },
             { name: 'category', label: 'Category', type: 'select', options: serviceCategories.map(c => ({ value: c, label: c })) },
             { name: 'websiteUrl', label: 'Website URL', type: 'url', optional: true },
-            { name: 'contactEmail', label: 'Contact Email', type: 'email' },
+            { name: 'contactEmail', label: 'Contact Email', type: 'email', ...contactEmailField },
             { name: 'contactPhone', label: 'Contact Phone', type: 'tel' },
             { name: 'description', label: 'Description', type: 'textarea' },
           ]}
@@ -127,12 +122,32 @@ export function ListingFormTabs({ user }: ListingFormTabsProps) {
             { name: 'physicalAddress', label: 'Physical Address (optional)', type: 'textarea', optional: true, placeholder: "Enter the full physical address" },
             { name: 'category', label: 'Category', type: 'select', options: attractionCategories.map(c => ({ value: c, label: c })) },
             { name: 'websiteUrl', label: 'Website URL', type: 'url', optional: true },
-            { name: 'contactEmail', label: 'Contact Email', type: 'email', optional: true },
+            { name: 'contactEmail', label: 'Contact Email', type: 'email', optional: true, ...contactEmailField },
             { name: 'description', label: 'Description', type: 'textarea' },
           ]}
         />
       </TabsContent>
     </Tabs>
+  );
+}
+
+// The Accommodation tab's form on its own, so the Accommodation page renders
+// the exact same form without the category tabs.
+export function AccommodationListingForm({ user }: ListingFormTabsProps) {
+  return (
+    <ListingForm user={user} collectionName="accommodations" formSchema={accommodationSchema} title="Accommodation" description="List your hotel, guesthouse, B&B, or other accommodation."
+      fields={[
+        { name: 'name', label: 'Accommodation Name', type: 'text' },
+        { name: 'townSlug', label: 'Town', type: 'combobox' },
+        { name: 'physicalAddress', label: 'Physical Address (optional)', type: 'textarea', optional: true, placeholder: "Enter the full physical address" },
+        { name: 'category', label: 'Category', type: 'select', options: accommodationCategories.map(c => ({ value: c, label: c })) },
+        { name: 'websiteUrl', label: 'Website URL', type: 'url', optional: true },
+        { name: 'bookingSiteUrl', label: 'Booking Site URL', type: 'url', optional: true },
+        { name: 'contactEmail', label: 'Contact Email', type: 'email', ...contactEmailField },
+        { name: 'contactPhone', label: 'Contact Phone', type: 'tel' },
+        { name: 'description', label: 'Description', type: 'textarea' },
+      ]}
+    />
   );
 }
 
@@ -143,6 +158,7 @@ interface FieldConfig {
   options?: { value: string; label: string }[];
   optional?: boolean;
   placeholder?: string;
+  helperText?: string;
 }
 
 interface ListingFormProps {
@@ -168,15 +184,10 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
     resolver: zodResolver(formSchema),
     defaultValues: {
       ...fields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {}),
-      contactEmail: user.email || '',
       termsAndConditions: false,
     },
     mode: 'onChange',
   });
-
-  useEffect(() => {
-    form.setValue('contactEmail', user.email || '');
-  }, [user.email, form]);
 
   const provinceMap = useMemo(() => new Map(provinces.map(p => [p.slug, p.name])), []);
   const townsWithProvince = useMemo(() => towns.map(town => ({
@@ -328,9 +339,10 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
                         ) : field.type === 'textarea' ? (
                           <Textarea {...formField} placeholder={field.placeholder || `A bit about your ${title.toLowerCase()}...`} />
                         ) : (
-                          <Input {...formField} type={field.type} disabled={field.name === 'contactEmail'} />
+                          <Input {...formField} type={field.type} placeholder={field.placeholder} autoComplete={field.name === 'contactEmail' ? 'off' : undefined} />
                         )}
                       </FormControl>
+                      {field.helperText && <FormDescription><Translatable text={field.helperText} /></FormDescription>}
                       <FormMessage />
                     </FormItem>
                   )}
