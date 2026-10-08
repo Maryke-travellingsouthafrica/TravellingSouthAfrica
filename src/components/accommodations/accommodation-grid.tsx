@@ -3,8 +3,8 @@
  
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ListingCard } from '@/components/listings/listing-card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogHeader, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { AccessibleDialogContent } from "@/components/ui/AccessibleDialogContent";
@@ -226,76 +226,23 @@ function AccommodationModal({
   );
 }
  
-// ── Card ────────────────────────────────────────────────────────────────────
-function AccommodationCard({
-  listing,
-  onClick,
-}: {
-  listing: Listing;
-  onClick: () => void;
-}) {
-  return (
-    <Card
-      className="flex flex-col overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-      onClick={onClick}
-    >
-      <ImageCarousel 
-        images={listing.imageUrls || []} 
-        name={listing.name} 
-        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-      />
- 
-      <CardContent className="p-4 flex flex-col flex-1 space-y-2">
-        <div>
-          <h3 className="text-lg font-bold text-primary leading-tight">{listing.name}</h3>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            {listing.category && (
-              <span className="bg-secondary px-2 py-0.5 rounded-full text-xs">
-                {listing.category}
-              </span>
-            )}
-            {listing.townSlug && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                {formatTownName(listing.townSlug)}
-              </span>
-            )}
-          </div>
-        </div>
- 
-        {listing.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">{listing.description}</p>
-        )}
- 
-        {listing.contactPhone && (
-          <div className="flex items-center gap-1 text-sm pt-1">
-            <Phone className="h-3 w-3 text-primary shrink-0" />
-            <span>{listing.contactPhone}</span>
-          </div>
-        )}
- 
-        <div className="pt-2 mt-auto">
-          <span className="text-xs text-primary font-medium hover:underline">
-            View details →
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
- 
 // ── Grid (exported) ─────────────────────────────────────────────────────────
+// Cards share the Service Providers card layout; the image, title and
+// "View details →" link open the modal below.
 export function AccommodationGrid({ listings }: { listings: Listing[] }) {
   const [selected, setSelected] = useState<Listing | null>(null);
- 
+
   return (
     <>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         {listings.map((listing) => (
-          <AccommodationCard
+          <ListingCard
             key={listing.id}
             listing={listing}
-            onClick={() => setSelected(listing)}
+            categoryIcon={Building2}
+            normalizeWebsiteUrl
+            clampDescription
+            onOpenDetails={() => setSelected(listing)}
           />
         ))}
       </div>
