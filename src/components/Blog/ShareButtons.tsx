@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 export function ShareButtons({ url, title }: { url: string; title: string }) {
   const [copied, setCopied] = useState(false);
 
-  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(`${title} ${url}`)}`;
+  // Emoji in the title come through garbled in WhatsApp's prefilled text, so drop them here only.
+  const shareTitle = title
+    .replace(/[\p{Extended_Pictographic}️‍]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(`${shareTitle} ${url}`.trim())}`;
   const facebookHref = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
 
   const copyLink = async () => {
