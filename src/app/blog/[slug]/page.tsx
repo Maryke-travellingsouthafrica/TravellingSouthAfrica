@@ -174,7 +174,7 @@ export default async function BlogPostPage(props: { params: Promise<{ slug: stri
             </p>
           )}
 
-          <BlogPostContent content={post.content} />
+          <BlogPostContent content={post.content} postId={post.id} />
 
           <div className="pt-6 mt-6 border-t border-border/50">
             <ShareButtons url={url} title={title} />
