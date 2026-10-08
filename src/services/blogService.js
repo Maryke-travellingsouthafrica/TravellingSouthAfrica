@@ -24,6 +24,7 @@ const blogPostsCollection = collection(firestore, 'blogPosts');
  * @param {string} postData.author - Post author
  * @param {string} postData.imageUrl - Post image URL
  * @param {boolean} postData.published - Published status
+ * @param {string} [postData.slug] - URL slug for the post's public page
  * @returns {Promise<string>} - Document ID of the created post
  */
 export async function createBlogPost(postData) {

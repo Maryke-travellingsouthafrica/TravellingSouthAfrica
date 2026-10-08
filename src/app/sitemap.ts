@@ -3,10 +3,14 @@ import { provinces } from '@/lib/data/provinces';
 import { towns } from '@/lib/data/towns';
 import { sights } from '@/lib/data/sights';
 import { routes } from '@/lib/data/routes';
+import { getPostUrl, getPublishedPosts } from '@/lib/blog';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://travellingsouthafrica.co.za';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// Regenerated hourly so newly published blog posts appear without a redeploy.
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date();
 
   const staticPages = [
@@ -68,5 +72,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...provincePages, ...townPages, ...sightPages, ...routePages];
+  // Blog posts come from Firestore; if that read fails the rest of the sitemap still ships.
+  let blogPages: MetadataRoute.Sitemap = [];
+  try {
+    const posts = await getPublishedPosts();
+    blogPages = posts.map((post) => ({
+      url: getPostUrl(post),
+      lastModified: post.dateMs ? new Date(post.dateMs) : lastModified,
+      changeFrequency: 'monthly' as const,
+      priority: 0.7,
+    }));
+  } catch (error) {
+    console.error('Error fetching blog posts for sitemap:', error);
+  }
+
+  return [...staticPages, ...provincePages, ...townPages, ...sightPages, ...routePages, ...blogPages];
 }

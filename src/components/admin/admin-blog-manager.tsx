@@ -16,9 +16,11 @@ import { Trash2, Edit2, Eye, EyeOff, Upload, Loader2, X } from 'lucide-react';
 import { createBlogPost, getAllBlogPosts, updateBlogPost, deleteBlogPost } from '@/services/blogService';
 import { uploadBlogImage, deleteBlogImage } from '@/services/storageService';
 import { Translatable } from '@/components/translatable';
+import { slugify, uniqueSlug } from '@/lib/slug';
 
 interface BlogPost {
   id: string;
+  slug?: string;
   title: string;
   caption: string;
   content: string;
@@ -165,6 +167,14 @@ export function AdminBlogManager() {
 
     setIsLoading(true);
 
+    // The slug is the post's public URL (/blog/[slug]). It is set once and never
+    // regenerated on a title edit, so links already shared keep working.
+    const buildSlug = (excludeId?: string) =>
+      uniqueSlug(
+        slugify(formData.title) || 'post',
+        blogPosts.filter(post => post.id !== excludeId).map(post => post.slug || slugify(post.title))
+      );
+
     try {
       if (editingPost) {
         await updateBlogPost(editingPost.id, {
@@ -174,6 +184,7 @@ export function AdminBlogManager() {
           author: formData.author,
           imageUrl: formData.imageUrl,
           published: formData.published,
+          ...(editingPost.slug ? {} : { slug: buildSlug(editingPost.id) }),
         });
         toast({
           title: 'Success',
@@ -188,6 +199,7 @@ export function AdminBlogManager() {
           author: formData.author,
           imageUrl: formData.imageUrl,
           published: formData.published,
+          slug: buildSlug(),
         });
         toast({
           title: 'Success',

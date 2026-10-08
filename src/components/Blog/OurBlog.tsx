@@ -1,26 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { ImageIcon, Calendar, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
+import { ImageIcon, Calendar, ChevronDown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Translatable } from '@/components/translatable';
 import { getPublishedBlogPosts } from '@/services/blogService';
-import DOMPurify from 'isomorphic-dompurify';
-
-// Posts written with the rich text editor are stored as HTML; older posts are plain text.
-const isHtmlContent = (content: string | undefined) => !!content && /<\/?[a-z][\s\S]*>/i.test(content);
+import { getBlogPostSlug } from '@/lib/slug';
 
 interface BlogPost {
   id: string;
+  slug?: string;
   title: string;
   caption: string;
   content: string;
@@ -58,74 +50,25 @@ function truncateCaption(caption: string | undefined, maxLength = 100) {
   return caption.slice(0, maxLength).trimEnd() + '…';
 }
 
-// Renders plain text as React nodes, turning Markdown-style [label](url) links
-// and bare https:// URLs into clickable <a> tags. Avoids dangerouslySetInnerHTML.
-function renderContentWithLinks(text: string | undefined): React.ReactNode {
-  if (!text) return null;
-
-  const pattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<]+)/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-
-  while ((match = pattern.exec(text)) !== null) {
-    let matchEnd = match.index + match[0].length;
-    let url = match[2];
-    let label = match[1];
-
-    if (!url && match[3]) {
-      // Bare URL — trim trailing punctuation that's likely part of the sentence, not the link.
-      const trimmed = match[3].replace(/[.,!?;:'")\]]+$/, '');
-      matchEnd = match.index + trimmed.length;
-      url = trimmed;
-      label = trimmed;
-    }
-
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
-    }
-
-    nodes.push(
-      <a
-        key={`link-${key++}`}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary underline underline-offset-2 hover:text-primary/80"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {label}
-      </a>
-    );
-
-    lastIndex = matchEnd;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-
-  return nodes;
-}
-
 interface PostCardProps {
   post: BlogPost;
-  onPreview: (post: BlogPost) => void;
 }
 
-function PostCard({ post, onPreview }: PostCardProps) {
+function PostCard({ post }: PostCardProps) {
+  const router = useRouter();
   const caption = truncateCaption(post.caption);
+  // Each post has its own page (and share preview) at /blog/[slug].
+  const openPost = () => router.push(`/blog/${getBlogPostSlug(post)}`);
 
   return (
     <Card
       className="group overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5 flex flex-col h-full cursor-pointer border border-border/60"
-      onClick={() => onPreview(post)}
+      onClick={openPost}
     >
       {/* Image — reduced height for better proportions */}
       <div className="relative h-44 w-full overflow-hidden bg-muted flex-shrink-0">
         {post.imageUrl ? (
-          <Image
+          <ImageWithFallback
             src={post.imageUrl}
             alt={post.title}
             fill
@@ -173,7 +116,7 @@ function PostCard({ post, onPreview }: PostCardProps) {
             className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
             onClick={(e) => {
               e.stopPropagation();
-              onPreview(post);
+              openPost();
             }}
           >
             Read article
@@ -189,8 +132,6 @@ export function OurBlog() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
-  const [expandedContent, setExpandedContent] = useState(false);
 
   useEffect(() => {
     fetchPublishedPosts();
@@ -244,123 +185,10 @@ export function OurBlog() {
   }
 
   return (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} onPreview={setSelectedPost} />
-        ))}
-      </div>
-
-      {/* Post Modal */}
-      {selectedPost && (
-        <Dialog
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setSelectedPost(null);
-              setExpandedContent(false);
-            }
-          }}
-        >
-          <DialogContent className="max-w-6xl w-[95vw] h-[92vh] max-h-[92vh] overflow-y-auto p-0 gap-0 rounded-xl">
-            {/* Required for screen reader accessibility */}
-            <VisuallyHidden>
-              <DialogTitle>{selectedPost.title}</DialogTitle>
-            </VisuallyHidden>
-
-            {/* Modal Image — large hero, sits at the top flush */}
-            <div className="relative h-[45vh] min-h-[320px] w-full overflow-hidden rounded-t-xl bg-muted flex-shrink-0">
-              {selectedPost.imageUrl ? (
-                <Image
-                  src={selectedPost.imageUrl}
-                  alt={selectedPost.title}
-                  fill
-                  className="object-cover"
-                  sizes="95vw"
-                  priority
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <ImageIcon className="h-10 w-10 text-muted-foreground" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              {/* Title overlay on image */}
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <Badge variant="secondary" className="text-[11px] mb-2">Article</Badge>
-                <h2 className="text-white font-bold text-2xl md:text-3xl leading-tight drop-shadow-sm">
-                  {selectedPost.title}
-                </h2>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 md:p-8 space-y-4 max-w-3xl mx-auto">
-              {/* Meta */}
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {selectedPost.date ? formatDate(selectedPost.date) : 'Date unknown'}
-                </span>
-                <span className="text-border">•</span>
-                <span className="flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  {selectedPost.author}
-                </span>
-              </div>
-
-              {/* Caption */}
-              {selectedPost.caption && (
-                <p className="text-base font-medium text-foreground italic border-l-2 border-primary pl-3">
-                  {selectedPost.caption}
-                </p>
-              )}
-
-              {/* Content */}
-              {isHtmlContent(selectedPost.content) ? (
-                <div
-                  className={`relative text-lg leading-loose text-foreground [&_p]:my-3 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-2 [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-3 [&_blockquote]:italic ${
-                    expandedContent ? '' : 'max-h-52 overflow-hidden'
-                  }`}
-                >
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: DOMPurify.sanitize(selectedPost.content, { ADD_ATTR: ['target', 'rel', 'style'] }),
-                    }}
-                  />
-                  {!expandedContent && (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
-                  )}
-                </div>
-              ) : (
-                <div className="text-lg leading-loose text-foreground">
-                  {expandedContent ? (
-                    <p className="whitespace-pre-wrap">{renderContentWithLinks(selectedPost.content)}</p>
-                  ) : (
-                    <p className="line-clamp-5 whitespace-pre-wrap">{renderContentWithLinks(selectedPost.content)}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Show More / Less */}
-              {selectedPost.content && selectedPost.content.length > 300 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setExpandedContent(!expandedContent)}
-                  className="w-full text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {expandedContent ? (
-                    <><ChevronUp className="h-3.5 w-3.5 mr-1" />Show less</>
-                  ) : (
-                    <><ChevronDown className="h-3.5 w-3.5 mr-1" />Show full article</>
-                  )}
-                </Button>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-    </>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {posts.map((post) => (
+        <PostCard key={post.id} post={post} />
+      ))}
+    </div>
   );
 }
