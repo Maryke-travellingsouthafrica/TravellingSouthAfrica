@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import Image from 'next/image';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import Link from 'next/link';
-import { ExternalLink, Instagram, ImageIcon, Film, Calendar, ArrowRight, Music2, Facebook, BookOpen } from 'lucide-react';
+import { ExternalLink, Instagram, ImageIcon, Film, Calendar, ArrowRight, Facebook, BookOpen } from 'lucide-react';
 import { Translatable } from '@/components/translatable';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,15 +17,13 @@ import {
 } from '@/components/ui/dialog';
 import type { InstagramPost } from '@/app/api/instagram/route';
 import type { FacebookPost } from '@/app/api/facebook/route';
-import type { TikTokPost } from '@/app/api/tiktok/route';
-import { TikTokVideo } from '@/components/tiktok-video';
 import { OurBlog } from '@/components/Blog/OurBlog';
 
 // ── Platform types ────────────────────────────────────────────────────────────
 
-type Platform = 'Instagram' | 'TikTok' | 'Facebook' | 'OurBlog';
+type Platform = 'Instagram' | 'Facebook' | 'OurBlog';
 
-const platforms: Platform[] = ['OurBlog', 'Instagram', 'TikTok', 'Facebook'];
+const platforms: Platform[] = ['OurBlog', 'Instagram', 'Facebook'];
 
 const platformMeta: Record<
   Platform,
@@ -36,12 +34,6 @@ const platformMeta: Record<
     label: 'Instagram',
     handle: '@travellingsouthafrica.co.za',
     profileUrl: 'https://instagram.com/travellingsouthafrica.co.za',
-  },
-  TikTok: {
-    icon: Music2,
-    label: 'TikTok',
-    handle: '@travellingsouthaf',
-    profileUrl: 'https://www.tiktok.com/@travellingsouthaf',
   },
   Facebook: {
     icon: Facebook,
@@ -102,19 +94,6 @@ function normalizeFacebook(post: FacebookPost): UnifiedPost {
   };
 }
 
-function normalizeTikTok(post: TikTokPost): UnifiedPost {
-  return {
-    id: post.id,
-    platform: 'TikTok',
-    imageUrl: undefined,
-    caption: undefined,
-    timestamp: undefined,
-    username: post.username,
-    permalink: post.videoUrl,
-    mediaType: 'video',
-  };
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(timestamp: string) {
@@ -147,31 +126,6 @@ function PostSkeleton() {
   );
 }
 
-// ── TikTok embed card ─────────────────────────────────────────────────────────
-
-function TikTokEmbedCard({ post }: { post: UnifiedPost }) {
-  return (
-    <Card className="overflow-hidden flex flex-col">
-      {/* Native TikTok embed */}
-      <TikTokVideo
-        username={post.username ?? 'travellingsouthaf'}
-        videoId={post.id}
-      />
-      <div className="p-4">
-        <Link
-          href={post.permalink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-        >
-          View on TikTok
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-    </Card>
-  );
-}
-
 // ── Post card ─────────────────────────────────────────────────────────────────
 
 function PostCard({
@@ -187,11 +141,7 @@ function PostCard({
     post.mediaType === 'video' ? 'Video' : post.mediaType === 'carousel' ? 'Gallery' : 'Photo';
 
   const viewLabel =
-    post.platform === 'Instagram'
-      ? 'View on Instagram'
-      : post.platform === 'TikTok'
-      ? 'View on TikTok'
-      : 'View on Facebook';
+    post.platform === 'Instagram' ? 'View on Instagram' : 'View on Facebook';
 
   return (
     <Card
@@ -201,7 +151,7 @@ function PostCard({
       {/* Image */}
       <div className="relative block h-56 w-full overflow-hidden bg-muted flex-shrink-0">
         {post.imageUrl ? (
-          <Image
+          <ImageWithFallback
             src={post.imageUrl}
             alt={post.caption ?? `${post.platform} post`}
             fill
@@ -322,12 +272,7 @@ function SocialFeed({ platform }: { platform: Exclude<Platform, 'OurBlog'> }) {
     setLoading(true);
     setError(null);
 
-    const endpoint =
-      platform === 'Instagram'
-        ? '/api/instagram'
-        : platform === 'Facebook'
-        ? '/api/facebook'
-        : '/api/tiktok';
+    const endpoint = platform === 'Instagram' ? '/api/instagram' : '/api/facebook';
 
     try {
       const res = await fetch(endpoint);
@@ -342,9 +287,7 @@ function SocialFeed({ platform }: { platform: Exclude<Platform, 'OurBlog'> }) {
       const raw: UnifiedPost[] =
         platform === 'Instagram'
           ? (json.data ?? []).map(normalizeInstagram)
-          : platform === 'Facebook'
-          ? (json.data ?? []).map(normalizeFacebook)
-          : (json.data ?? []).map(normalizeTikTok);
+          : (json.data ?? []).map(normalizeFacebook);
 
       setPosts(raw);
     } catch {
@@ -389,32 +332,17 @@ function SocialFeed({ platform }: { platform: Exclude<Platform, 'OurBlog'> }) {
         <p className="text-muted-foreground text-lg">
           <Translatable text="No posts to display yet." />
         </p>
-        {platform === 'TikTok' && (
-          <p className="text-sm text-muted-foreground mt-2 max-w-sm">
-            Add your TikTok video URLs to{' '}
-            <code className="font-mono text-xs">src/lib/tiktok-videos.ts</code>.
-          </p>
-        )}
       </div>
     );
   }
 
   return (
     <>
-      {platform === 'TikTok' ? (
-        // Portrait embeds — 2-col grid so they're not too narrow
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {posts.map((post) => (
-            <TikTokEmbedCard key={post.id} post={post} />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} onPreview={setSelected} />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {posts.map((post) => (
+          <PostCard key={post.id} post={post} onPreview={setSelected} />
+        ))}
+      </div>
 
       {selected && (
         <Dialog open onOpenChange={(open) => !open && setSelected(null)}>
@@ -430,7 +358,7 @@ function SocialFeed({ platform }: { platform: Exclude<Platform, 'OurBlog'> }) {
             <div className="grid gap-6">
               <div className="relative h-80 overflow-hidden rounded-lg bg-muted">
                 {selected.imageUrl ? (
-                  <Image
+                  <ImageWithFallback
                     src={selected.imageUrl}
                     alt={selected.caption ?? 'Post preview'}
                     fill
