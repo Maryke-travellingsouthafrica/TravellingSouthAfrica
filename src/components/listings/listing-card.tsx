@@ -12,9 +12,9 @@ import {
   MapPin,
   Star,
   ChevronLeft,
-  ChevronRight,
-  ExternalLink
+  ChevronRight
 } from 'lucide-react';
+import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 
 /** Adds https:// to a stored URL that has no scheme, e.g. "www.example.co.za". */
 export function withHttps(url: string) {
@@ -54,8 +54,6 @@ export function ListingCard({
     e.stopPropagation();
     setCurrentIndex((prevIndex) => (prevIndex === images.length - 1 ? 0 : prevIndex + 1));
   };
-
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.physicalAddress || `${listing.name}, ${listing.townSlug}`)}`;
   const websiteUrl = listing.websiteUrl && normalizeWebsiteUrl ? withHttps(listing.websiteUrl) : listing.websiteUrl;
 
   return (
@@ -185,12 +183,7 @@ export function ListingCard({
             </Button>
           )}
           {listing.physicalAddress && (
-             <Button asChild variant="outline" className="w-full sm:w-auto flex-1">
-              <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Get Directions
-              </a>
-            </Button>
+            <GetDirectionsButton item={listing} className="w-full sm:w-auto flex-1" />
           )}
         </div>
 

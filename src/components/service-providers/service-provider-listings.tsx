@@ -37,9 +37,9 @@ import {
   Utensils,
   Bed,
   Briefcase,
-  Wrench,
-  ExternalLink
+  Wrench
 } from 'lucide-react';
+import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const categoryIcons: { [key: string]: React.ElementType } = {
@@ -83,7 +83,6 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
   };
 
   const CategoryIcon = categoryIcons[listing.category] || Wrench;
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.physicalAddress || `${listing.name}, ${listing.townSlug}`)}`;
 
   return (
     <Card className="flex flex-col overflow-hidden bg-white transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
@@ -203,12 +202,7 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
             </Button>
           )}
           {listing.physicalAddress && (
-             <Button asChild variant="outline" className="w-full sm:w-auto flex-1">
-              <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Get Directions
-              </a>
-            </Button>
+            <GetDirectionsButton item={listing} className="w-full sm:w-auto flex-1" />
           )}
         </div>
       </CardContent>

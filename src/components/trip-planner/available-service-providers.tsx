@@ -15,6 +15,7 @@ import { Translatable } from '../translatable';
 import { useToast } from '@/hooks/use-toast';
 import { serviceCategoriesMap } from '@/lib/service-categories';
 import { Dialog } from '@/components/ui/dialog';
+import { GetDirectionsButton, actionRowClass } from '@/components/listings/get-directions-button';
 import { AccessibleDialogContent } from '@/components/ui/AccessibleDialogContent';
  
 interface ServiceProvider {
@@ -224,8 +225,8 @@ function ServiceProviderDetailModal({
             )}
           </div>
  
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-2 pt-2 border-t">
+          {/* Action buttons (four buttons wrap to 2×2 on small screens) */}
+          <div className={actionRowClass(provider)}>
             <Button
               onClick={onToggle}
               variant={isSelected ? 'default' : 'outline'}
@@ -241,6 +242,7 @@ function ServiceProviderDetailModal({
                 </a>
               </Button>
             )}
+            <GetDirectionsButton item={provider} size="sm" className="flex-1" />
             {provider.bookingSiteUrl && (
               <Button asChild size="sm" className="flex-1">
                 <a href={provider.bookingSiteUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>

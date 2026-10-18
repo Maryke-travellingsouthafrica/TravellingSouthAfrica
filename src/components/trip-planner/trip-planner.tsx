@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { AddToTripDialog } from './add-to-trip-dialog';
 import Link from 'next/link';
 import { Phone, Mail, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { GetDirectionsButton, actionRowClass } from '@/components/listings/get-directions-button';
 
 import { provinces } from '@/lib/data/provinces';
 import { towns } from '@/lib/data/towns';
@@ -388,8 +389,8 @@ function AccommodationDetailModal({
             )}
           </div>
  
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-2 pt-2 border-t">
+          {/* Action buttons (four buttons wrap to 2×2 on small screens) */}
+          <div className={actionRowClass(accommodation)}>
             <Button
               onClick={onToggle}
               variant={isSelected ? 'default' : 'outline'}
@@ -405,6 +406,7 @@ function AccommodationDetailModal({
                 </a>
               </Button>
             )}
+            <GetDirectionsButton item={accommodation} size="sm" className="flex-1" />
             {accommodation.bookingSiteUrl && (
               <Button asChild size="sm" className="flex-1">
                 <a href={accommodation.bookingSiteUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
@@ -741,6 +743,7 @@ function SightDetailModal({
                 </a>
               </Button>
             )}
+            <GetDirectionsButton item={sight} size="sm" className="flex-1" />
           </div>
         </div>
       </AccessibleDialogContent>
@@ -811,6 +814,7 @@ function AvailableSights({
               townSlug: towns.find(t => t.name === s.location)?.slug || '',
               imageUrls: image ? [image.imageUrl] : [],
               description: s.description,
+              mapLocation: s.mapLocation,
             };
           });
 
