@@ -4,6 +4,8 @@ import { towns } from '@/lib/data/towns';
 import { sights } from '@/lib/data/sights';
 import { routes } from '@/lib/data/routes';
 import { getPostUrl, getPublishedPosts } from '@/lib/blog';
+import { getListingUrl } from '@/lib/listing-links';
+import { getAllPublicListings } from '@/lib/public-listings';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://travellingsouthafrica.co.za';
 
@@ -86,5 +88,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Error fetching blog posts for sitemap:', error);
   }
 
-  return [...staticPages, ...provincePages, ...townPages, ...sightPages, ...routePages, ...blogPages];
+  // Public listing pages: approved accommodations and service providers, plus events.
+  // A failed read must not take the rest of the sitemap down with it.
+  const listingPages: MetadataRoute.Sitemap = [];
+  for (const kind of ['accommodation', 'service-provider', 'event'] as const) {
+    try {
+      const listings = await getAllPublicListings(kind);
+      for (const listing of listings) {
+        listingPages.push({
+          url: getListingUrl(kind, listing),
+          lastModified,
+          changeFrequency: kind === 'event' ? 'weekly' : 'monthly',
+          priority: 0.6,
+        });
+      }
+    } catch (error) {
+      console.error(`Error fetching ${kind} listings for sitemap:`, error);
+    }
+  }
+
+  return [...staticPages, ...provincePages, ...townPages, ...sightPages, ...routePages, ...blogPages, ...listingPages];
 }

@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getListingPath } from '@/lib/listing-links';
 
 const categoryIcons: { [key: string]: React.ElementType } = {
   'Car Hire': Car,
@@ -146,7 +147,11 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
                     <CategoryIcon className="h-3 w-3 mr-1.5" />
                     {listing.category}
                 </Badge>
-                <h3 className="text-2xl font-bold text-primary leading-tight">{listing.name}</h3>
+                <h3 className="text-2xl font-bold text-primary leading-tight">
+                  <Link href={getListingPath('service-provider', listing)} className="hover:underline">
+                    {listing.name}
+                  </Link>
+                </h3>
               </div>
               <div className="flex items-center gap-0.5 text-yellow-400 mt-1 shrink-0">
                   <Star className="h-4 w-4" />

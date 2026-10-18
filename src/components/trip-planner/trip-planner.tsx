@@ -15,6 +15,7 @@ import { Translatable } from '../translatable';
 import { format } from 'date-fns';
 import { AddToTripDialog } from './add-to-trip-dialog';
 import Link from 'next/link';
+import { getListingPath } from '@/lib/listing-links';
 import { Phone, Mail, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GetDirectionsButton, actionRowClass } from '@/components/listings/get-directions-button';
 
@@ -286,7 +287,11 @@ function AccommodationDetailModal({
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <AccessibleDialogContent
-        title={accommodation.name}
+        title={
+          <Link href={getListingPath('accommodation', accommodation)} className="hover:underline">
+            {accommodation.name}
+          </Link>
+        }
         description={`Details for ${accommodation.name}`}
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}

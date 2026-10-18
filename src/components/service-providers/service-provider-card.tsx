@@ -2,9 +2,15 @@
 import { Briefcase } from 'lucide-react';
 import { serviceCategoriesMap } from '@/lib/service-categories';
 import { ListingCard } from '@/components/listings/listing-card';
+import { getListingPath } from '@/lib/listing-links';
 
 export function ServiceProviderCard({ listing }: { listing: any }) {
   const CategoryIcon = serviceCategoriesMap[listing.category]?.icon || Briefcase;
 
-  return <ListingCard listing={listing} categoryIcon={CategoryIcon} showStars />;
+  return <ListingCard
+      listing={listing}
+      categoryIcon={CategoryIcon}
+      showStars
+      detailHref={getListingPath('service-provider', listing)}
+    />;
 }

@@ -1,6 +1,8 @@
 'use client';
  
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import { getListingPath } from '@/lib/listing-links';
 import {
   collection,
   query,
@@ -123,7 +125,11 @@ function ServiceProviderDetailModal({
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <AccessibleDialogContent
-        title={provider.name}
+        title={
+          <Link href={getListingPath('service-provider', provider)} className="hover:underline">
+            {provider.name}
+          </Link>
+        }
         description={`Details for ${provider.name}`}
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}

@@ -8,7 +8,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 import { towns } from '@/lib/data/towns';
-import { formatEventDateRange, getEventStart, slugifyEventTitle, type TimestampLike } from '@/lib/events';
+import { formatEventDateRange, getEventStart, type TimestampLike } from '@/lib/events';
+import { getListingPath } from '@/lib/listing-links';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,7 +113,7 @@ export default async function EventsPage() {
                 const townName = event.townSlug ? townNameMap.get(event.townSlug) || event.townSlug : null;
 
                 return (
-                  <Link href={`/events/${slugifyEventTitle(event.title)}`} key={event.id}>
+                  <Link href={getListingPath('event', { id: event.id, title: event.title })} key={event.id}>
                     <Card className="group overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1 h-full">
                       <div className="relative h-64 w-full overflow-hidden bg-muted">
                         <ImageWithFallback

@@ -1,24 +1,29 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 import { Translatable } from '@/components/translatable';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { LinkifiedText } from '@/components/linkified-text';
 import { CalendarDays, MapPin } from 'lucide-react';
+import { ShareButton } from '@/components/listings/share-button';
+import { buildListingSlug, getListingIdCandidates, getListingPath, getSiteUrl } from '@/lib/listing-links';
 import type { Metadata } from 'next';
 import { towns } from '@/lib/data/towns';
 import { provinces } from '@/lib/data/provinces';
 import {
   formatEventDateRange,
+  getEventEndDayPassed,
+  getEventTimeLabel,
   getEventEnd,
   getEventStart,
   slugifyEventTitle,
   type TimestampLike,
 } from '@/lib/events';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://travellingsouthafrica.co.za';
+const siteUrl = getSiteUrl();
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +52,17 @@ async function getEventBySlug(slug: string): Promise<EventItem | null> {
   try {
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     const firestore = getFirestore(app);
+
+    // Current links end in the doc ID (`<title>-<docId>`), so a renamed event keeps working.
+    for (const id of getListingIdCandidates(slug)) {
+      if (!id || id.includes('/')) continue;
+      const snap = await getDoc(doc(firestore, 'events', id));
+      if (snap.exists()) {
+        return { id: snap.id, ...JSON.parse(JSON.stringify(snap.data())) } as EventItem;
+      }
+    }
+
+    // Legacy links: a bare title slug, resolved over the whole collection.
     const snapshot = await getDocs(collection(firestore, 'events'));
 
     const events = snapshot.docs.map((doc) => {
@@ -81,29 +97,32 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const formattedDate = formatEventDateRange(event);
   const title = `${event.title}${townName ? ` in ${townName}` : ''} | Travel SA | TravellingSA`;
   const description = `${formattedDate ? `${formattedDate}. ` : ''}${event.description}`.slice(0, 300);
+  const canonicalPath = getListingPath('event', { id: event.id, title: event.title });
+  const shortDescription = `${formattedDate ? `${formattedDate}. ` : ''}${event.description}`
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 150)
+    .replace(/\s+\S*$/, '');
+  const previewDescription = [shortDescription, townName].filter(Boolean).join(' – ');
+  const previewImage = event.imageUrl || `${siteUrl}/2026%20Logo%20(1)-Photoroom.png`;
 
   return {
     title,
     description,
     alternates: {
-      canonical: `/events/${params.slug}`,
+      canonical: canonicalPath,
     },
     openGraph: {
-      title,
-      description,
-      url: `${siteUrl}/events/${params.slug}`,
-      ...(event.imageUrl
-        ? {
-            images: [
-              {
-                url: event.imageUrl,
-                width: 600,
-                height: 400,
-                alt: event.title,
-              },
-            ],
-          }
-        : {}),
+      title: event.title,
+      description: previewDescription || description,
+      url: `${siteUrl}${canonicalPath}`,
+      images: [{ url: previewImage, alt: event.title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: event.title,
+      description: previewDescription || description,
+      images: [previewImage],
     },
   };
 }
@@ -116,12 +135,20 @@ export default async function EventDetailPage(props: { params: Promise<{ slug: s
     notFound();
   }
 
+  // Old name (or a legacy title-only link): send visitors to the current URL.
+  if (params.slug !== buildListingSlug(event.title, event.id)) {
+    permanentRedirect(getListingPath('event', { id: event.id, title: event.title }));
+  }
+  const eventUrl = `${siteUrl}${getListingPath('event', { id: event.id, title: event.title })}`;
+
   const town = event.townSlug ? towns.find((t) => t.slug === event.townSlug) : undefined;
   const townName = town?.name || event.townSlug;
   const province = town ? provinces.find((p) => p.slug === town.provinceSlug) : undefined;
   const formattedDate = formatEventDateRange(event);
   const start = getEventStart(event);
   const end = getEventEnd(event);
+  const timeLabel = getEventTimeLabel(event);
+  const hasPassed = getEventEndDayPassed(event);
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -143,7 +170,7 @@ export default async function EventDetailPage(props: { params: Promise<{ slug: s
         '@type': 'ListItem',
         position: 3,
         name: event.title,
-        item: `${siteUrl}/events/${params.slug}`,
+        item: eventUrl,
       },
     ],
   };
@@ -170,7 +197,7 @@ export default async function EventDetailPage(props: { params: Promise<{ slug: s
           },
         }
       : {}),
-    url: `${siteUrl}/events/${params.slug}`,
+    url: eventUrl,
   };
 
   return (
@@ -195,7 +222,13 @@ export default async function EventDetailPage(props: { params: Promise<{ slug: s
             <div className="flex items-center text-xl mt-2">
               <CalendarDays className="w-5 h-5 mr-2" />
               {formattedDate}
+              {timeLabel && <span className="ml-2">· {timeLabel}</span>}
             </div>
+          )}
+          {hasPassed && (
+            <p className="mt-3 inline-block rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-foreground">
+              <Translatable text="This event has passed" />
+            </p>
           )}
           {townName && (
             <div className="flex items-center text-xl mt-2">
@@ -240,6 +273,9 @@ export default async function EventDetailPage(props: { params: Promise<{ slug: s
                   {province && <>, <Translatable text={province.name} /></>}
                 </p>
               )}
+              <div className="pt-2">
+                <ShareButton url={eventUrl} title={event.title} text={`${event.title} on Travelling South Africa`} />
+              </div>
               <p className="pt-2">
                 <Link href="/events" className="text-primary hover:underline">
                   <Translatable text="Back to all events" />

@@ -124,3 +124,25 @@ export function isMultiDayEvent(event: EventDateFields) {
   const end = getEventEnd(event);
   return !!(start && end && !isSameDay(start, end));
 }
+
+const SA_TIME_ZONE = 'Africa/Johannesburg';
+const saDay = new Intl.DateTimeFormat('en-CA', { timeZone: SA_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+const saTime = new Intl.DateTimeFormat('en-GB', { timeZone: SA_TIME_ZONE, hour: '2-digit', minute: '2-digit', hour12: false });
+
+/**
+ * "18:00" when the start carries a real time of day (South African time), else null.
+ * Events entered with just a date are stored at midnight, which means "no time set".
+ */
+export function getEventTimeLabel(event: EventDateFields): string | null {
+  const start = getEventStart(event);
+  if (!start) return null;
+  const time = saTime.format(start);
+  return time === '00:00' || time === '24:00' ? null : time;
+}
+
+/** True once the event's last day (South African time) is over, so it stays "on" for its whole final day. */
+export function getEventEndDayPassed(event: EventDateFields, now: Date = new Date()): boolean {
+  const end = getEventEnd(event);
+  if (!end) return false;
+  return saDay.format(end) < saDay.format(now);
+}

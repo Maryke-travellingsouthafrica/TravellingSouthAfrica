@@ -19,6 +19,7 @@ import { createEvent, getAllEvents, updateEvent, deleteEvent, type EventDoc } fr
 import { formatEventDateRange, getEventEnd, getEventStart } from '@/lib/events';
 import { deleteEventImage } from '@/services/storageService';
 import { towns as allTownsData } from '@/lib/data/towns';
+import { ListingShareActions } from '@/components/listings/listing-share-actions';
 import { provinces } from '@/lib/data/provinces';
 
 interface FormData {
@@ -405,7 +406,8 @@ export function AdminEventsManager() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                  <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t">
+                    <ListingShareActions kind="event" listing={event} />
                     <Button variant="outline" size="sm" onClick={() => handleEdit(event)}>
                       <Edit2 className="h-4 w-4 mr-1" />
                       Edit

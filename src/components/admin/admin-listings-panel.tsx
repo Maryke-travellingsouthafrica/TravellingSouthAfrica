@@ -14,6 +14,7 @@ import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
 import { z } from 'zod';
 import Image from 'next/image';
+import { ListingShareActions } from '@/components/listings/listing-share-actions';
 import { ChevronDown, ChevronUp, Mail, Phone, Globe, MapPin, Tag, User, ExternalLink, ChevronLeft, ChevronRight, Settings, Trash2, Plus, Loader2 } from 'lucide-react';
 
 interface Listing {
@@ -35,6 +36,11 @@ interface Listing {
   imageUrls?: string[];
   [key: string]: any;
 }
+
+const SHAREABLE_KINDS: Record<string, 'accommodation' | 'service-provider'> = {
+  accommodations: 'accommodation',
+  service_providers: 'service-provider',
+};
 
 function ImageGallery({ images }: { images: string[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -343,7 +349,13 @@ function ListingCard({
         )}
       </CardContent>
 
-      <CardFooter>
+      <CardFooter className="flex-col items-stretch gap-2">
+        {/* Only approved listings have a public page to share. */}
+        {!isPending && collectionName in SHAREABLE_KINDS && (
+          <div className="flex flex-wrap gap-2">
+            <ListingShareActions kind={SHAREABLE_KINDS[collectionName]} listing={listing} />
+          </div>
+        )}
         <div className="flex gap-2 w-full">
           {isPending ? (
             <Button className="flex-1" onClick={() => onApprove(collectionName, listing.id)}>Approve</Button>

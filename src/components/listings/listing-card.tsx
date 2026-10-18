@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,8 @@ type ListingCardProps = {
   clampDescription?: boolean;
   /** When set, the image and title open the details view and a "View details →" link is shown. */
   onOpenDetails?: () => void;
+  /** Public page for this listing; when set the title links to it. */
+  detailHref?: string;
 };
 
 export function ListingCard({
@@ -41,6 +44,7 @@ export function ListingCard({
   normalizeWebsiteUrl = false,
   clampDescription = false,
   onOpenDetails,
+  detailHref,
 }: ListingCardProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const images = listing.imageUrls || [];
@@ -113,7 +117,11 @@ export function ListingCard({
                     {listing.category}
                 </Badge>
                 <h3 className="text-2xl font-bold text-primary leading-tight">
-                  {onOpenDetails ? (
+                  {detailHref ? (
+                    <Link href={detailHref} className="hover:underline">
+                      {listing.name}
+                    </Link>
+                  ) : onOpenDetails ? (
                     <button type="button" onClick={onOpenDetails} className="text-left hover:underline">
                       {listing.name}
                     </button>

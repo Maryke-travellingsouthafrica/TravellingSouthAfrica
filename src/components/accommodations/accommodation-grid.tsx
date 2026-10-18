@@ -4,7 +4,9 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { ListingCard } from '@/components/listings/listing-card';
+import { getListingPath } from '@/lib/listing-links';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogHeader, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { AccessibleDialogContent } from "@/components/ui/AccessibleDialogContent";
@@ -137,7 +139,11 @@ function AccommodationModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <AccessibleDialogContent
-        title={listing.name}
+        title={
+          <Link href={getListingPath('accommodation', listing)} className="hover:underline">
+            {listing.name}
+          </Link>
+        }
         description={`Detailed information for ${listing.name}`}
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
       >
@@ -242,6 +248,7 @@ export function AccommodationGrid({ listings }: { listings: Listing[] }) {
             categoryIcon={Building2}
             normalizeWebsiteUrl
             clampDescription
+            detailHref={getListingPath('accommodation', listing)}
             onOpenDetails={() => setSelected(listing)}
           />
         ))}
