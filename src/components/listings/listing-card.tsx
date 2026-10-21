@@ -16,6 +16,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
+import { ShareButton } from '@/components/listings/share-button';
 
 /** Adds https:// to a stored URL that has no scheme, e.g. "www.example.co.za". */
 export function withHttps(url: string) {
@@ -35,6 +36,8 @@ type ListingCardProps = {
   onOpenDetails?: () => void;
   /** Public page for this listing; when set the title links to it. */
   detailHref?: string;
+  /** Absolute public URL; when set a compact share button is shown on the image. */
+  shareUrl?: string;
 };
 
 export function ListingCard({
@@ -45,6 +48,7 @@ export function ListingCard({
   clampDescription = false,
   onOpenDetails,
   detailHref,
+  shareUrl,
 }: ListingCardProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const images = listing.imageUrls || [];
@@ -105,6 +109,15 @@ export function ListingCard({
             <div className="w-full h-full bg-muted flex items-center justify-center">
               <Building2 className="h-16 w-16 text-muted-foreground" />
             </div>
+          )}
+          {shareUrl && (
+            <ShareButton
+              iconOnly
+              url={shareUrl}
+              title={listing.name}
+              text={`${listing.name} on Travelling South Africa`}
+              className="absolute top-2 right-2 h-9 w-9 rounded-full bg-white/90 hover:bg-white shadow"
+            />
           )}
         </div>
       </CardHeader>

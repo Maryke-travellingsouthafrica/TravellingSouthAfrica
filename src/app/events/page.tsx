@@ -9,7 +9,8 @@ import { getFirestore, collection, query, where, orderBy, getDocs, Timestamp } f
 import { firebaseConfig } from '@/firebase/config';
 import { towns } from '@/lib/data/towns';
 import { formatEventDateRange, getEventStart, type TimestampLike } from '@/lib/events';
-import { getListingPath } from '@/lib/listing-links';
+import { getListingPath, getListingUrl } from '@/lib/listing-links';
+import { ShareButton } from '@/components/listings/share-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,6 +125,13 @@ export default async function EventsPage() {
                           className="object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        <ShareButton
+                          iconOnly
+                          url={getListingUrl('event', { id: event.id, title: event.title })}
+                          title={event.title}
+                          text={`${event.title} on Travelling South Africa`}
+                          className="absolute top-2 right-2 z-10 h-9 w-9 rounded-full bg-white/90 hover:bg-white shadow"
+                        />
                         <div className="absolute bottom-0 left-0 w-full p-4 text-white">
                           <h2 className="font-headline text-xl font-bold"><Translatable text={event.title} /></h2>
                           {formattedDate && (

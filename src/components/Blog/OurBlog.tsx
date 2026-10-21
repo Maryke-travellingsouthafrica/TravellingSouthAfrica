@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Translatable } from '@/components/translatable';
 import { getPublishedBlogPosts } from '@/services/blogService';
 import { getBlogPostSlug } from '@/lib/slug';
+import { getSiteUrl } from '@/lib/listing-links';
+import { ShareButton } from '@/components/listings/share-button';
 
 interface BlogPost {
   id: string;
@@ -87,6 +89,13 @@ function PostCard({ post }: PostCardProps) {
             Article
           </Badge>
         </div>
+        <ShareButton
+          iconOnly
+          url={`${getSiteUrl()}/blog/${getBlogPostSlug(post)}`}
+          title={post.title}
+          text={`${post.title} on Travelling South Africa`}
+          className="absolute top-2 right-2 h-9 w-9 rounded-full bg-white/90 hover:bg-white shadow"
+        />
       </div>
 
       {/* Content */}

@@ -6,7 +6,8 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ListingCard } from '@/components/listings/listing-card';
-import { getListingPath } from '@/lib/listing-links';
+import { getListingPath, getListingUrl } from '@/lib/listing-links';
+import { ShareButton } from '@/components/listings/share-button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogHeader, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { AccessibleDialogContent } from "@/components/ui/AccessibleDialogContent";
@@ -226,6 +227,12 @@ function AccommodationModal({
               </a>
             </Button>
           )}
+          <ShareButton
+            size="sm"
+            url={getListingUrl('accommodation', listing)}
+            title={listing.name}
+            text={`${listing.name} on Travelling South Africa`}
+          />
         </div>
       </AccessibleDialogContent>
     </Dialog>
@@ -249,6 +256,7 @@ export function AccommodationGrid({ listings }: { listings: Listing[] }) {
             normalizeWebsiteUrl
             clampDescription
             detailHref={getListingPath('accommodation', listing)}
+            shareUrl={getListingUrl('accommodation', listing)}
             onOpenDetails={() => setSelected(listing)}
           />
         ))}

@@ -40,8 +40,9 @@ import {
   Wrench
 } from 'lucide-react';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
+import { ShareButton } from '@/components/listings/share-button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getListingPath } from '@/lib/listing-links';
+import { getListingPath, getListingUrl } from '@/lib/listing-links';
 
 const categoryIcons: { [key: string]: React.ElementType } = {
   'Car Hire': Car,
@@ -128,6 +129,13 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
               <Building2 className="h-16 w-16 text-muted-foreground" />
             </div>
           )}
+          <ShareButton
+            iconOnly
+            url={getListingUrl('service-provider', listing)}
+            title={listing.name}
+            text={`${listing.name} on Travelling South Africa`}
+            className="absolute top-2 right-2 h-9 w-9 rounded-full bg-white/90 hover:bg-white shadow"
+          />
         </div>
         {images.length > 1 && (
           <div className="flex gap-2 p-2 bg-gray-100 overflow-x-auto">
