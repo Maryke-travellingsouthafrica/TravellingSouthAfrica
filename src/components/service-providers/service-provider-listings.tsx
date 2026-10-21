@@ -40,8 +40,10 @@ import {
   Wrench
 } from 'lucide-react';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
+import { ShareButton } from '@/components/listings/share-button';
+import { ListingDetailsDialog } from '@/components/listings/listing-details-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getListingPath } from '@/lib/listing-links';
+import { getListingPath, getListingUrl } from '@/lib/listing-links';
 
 const categoryIcons: { [key: string]: React.ElementType } = {
   'Car Hire': Car,
@@ -71,6 +73,7 @@ async function getServiceProviders(firestore: Firestore, category?: string) {
 
 export function ServiceProviderCard({ listing }: { listing: any }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const images = listing.imageUrls || [];
 
   const prevImage = (e: React.MouseEvent) => {
@@ -88,7 +91,7 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
   return (
     <Card className="flex flex-col overflow-hidden bg-white transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       <CardHeader className="p-0">
-        <div className="relative group aspect-video">
+        <div className="relative group aspect-video cursor-pointer" onClick={() => setDetailsOpen(true)}>
           {images.length > 0 ? (
             <>
               <Image
@@ -128,6 +131,13 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
               <Building2 className="h-16 w-16 text-muted-foreground" />
             </div>
           )}
+          <ShareButton
+            iconOnly
+            url={getListingUrl('service-provider', listing)}
+            title={listing.name}
+            text={`${listing.name} on Travelling South Africa`}
+            className="absolute top-2 right-2 h-9 w-9 rounded-full bg-white/90 hover:bg-white shadow"
+          />
         </div>
         {images.length > 1 && (
           <div className="flex gap-2 p-2 bg-gray-100 overflow-x-auto">
@@ -210,7 +220,21 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
             <GetDirectionsButton item={listing} className="w-full sm:w-auto flex-1" />
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setDetailsOpen(true)}
+          className="self-start text-sm text-primary font-medium hover:underline"
+        >
+          View details →
+        </button>
       </CardContent>
+      <ListingDetailsDialog
+        kind="service-provider"
+        listing={listing}
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+      />
     </Card>
   );
 }

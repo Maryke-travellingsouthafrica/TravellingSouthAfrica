@@ -9,6 +9,8 @@ import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 import { ShareButton } from '@/components/listings/share-button';
 import { withHttps } from '@/components/listings/listing-card';
+import { cn } from '@/lib/utils';
+import { ACTION_BASE, ACTION_GHOST, ACTION_PRIMARY, ACTION_SECONDARY } from '@/components/listings/listing-action-styles';
 
 type DetailListing = {
   id: string;
@@ -160,32 +162,47 @@ export function ListingDetailView({
               </div>
             )}
 
-            <div className="flex flex-col gap-2 pt-4 border-t sm:flex-row sm:flex-wrap">
-              {listing.websiteUrl && (
-                <Button asChild>
-                  <a href={withHttps(listing.websiteUrl)} target="_blank" rel="noopener noreferrer">
-                    <Globe className="h-4 w-4 mr-2" />
-                    Website
-                  </a>
-                </Button>
-              )}
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t sm:flex sm:flex-wrap sm:items-center">
               {listing.bookingSiteUrl && (
-                <Button asChild>
+                <Button asChild className={cn(ACTION_BASE, ACTION_PRIMARY, 'col-span-2 sm:col-auto')}>
                   <a href={withHttps(listing.bookingSiteUrl)} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4 mr-2" />
+                    <ExternalLink />
                     Book Now
                   </a>
                 </Button>
               )}
-              <GetDirectionsButton item={listing} />
-              <Button asChild variant="outline">
+              {listing.websiteUrl && (
+                <Button
+                  asChild
+                  variant={listing.bookingSiteUrl ? 'outline' : 'default'}
+                  className={cn(
+                    ACTION_BASE,
+                    listing.bookingSiteUrl ? ACTION_SECONDARY : cn(ACTION_PRIMARY, 'col-span-2 sm:col-auto'),
+                  )}
+                >
+                  <a href={withHttps(listing.websiteUrl)} target="_blank" rel="noopener noreferrer">
+                    <Globe />
+                    Website
+                  </a>
+                </Button>
+              )}
+              <GetDirectionsButton item={listing} className={cn(ACTION_BASE, ACTION_SECONDARY, '[&_svg]:mr-0')} />
+              <Button asChild variant="outline" className={cn(ACTION_BASE, ACTION_SECONDARY)}>
                 {/* Plan My Trip adds items to a saved trip chosen after login, so it can't preselect this one. */}
                 <Link href="/plan-your-trip">
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus />
                   Add to Trip
                 </Link>
               </Button>
-              <ShareButton url={shareUrl} title={listing.name} text={`${listing.name} on Travelling South Africa`} />
+              <span title="Share" className="flex">
+                <ShareButton
+                  iconOnly
+                  url={shareUrl}
+                  title={listing.name}
+                  text={`${listing.name} on Travelling South Africa`}
+                  className={cn(ACTION_BASE, ACTION_GHOST, 'w-full sm:w-11 px-0')}
+                />
+              </span>
             </div>
           </CardContent>
         </Card>
