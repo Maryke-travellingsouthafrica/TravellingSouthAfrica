@@ -1,3 +1,5 @@
+import './emulators';
+
 // Replace with this (NO fallbacks):
 export const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,

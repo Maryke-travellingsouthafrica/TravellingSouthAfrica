@@ -19,7 +19,8 @@ import { serviceCategoriesMap } from '@/lib/service-categories';
 import { Dialog } from '@/components/ui/dialog';
 import { GetDirectionsButton, actionRowClass } from '@/components/listings/get-directions-button';
 import { AccessibleDialogContent } from '@/components/ui/AccessibleDialogContent';
- 
+import { RatingBadge } from '@/components/reviews/rating-stars';
+
 interface ServiceProvider {
   id: string;
   name: string;
@@ -27,6 +28,8 @@ interface ServiceProvider {
   townSlug: string;
   description: string;
   imageUrls?: string[];
+  ratingAverage?: number;
+  ratingCount?: number;
   contactPhone?: string;
   contactEmail?: string;
   physicalAddress?: string;
@@ -384,6 +387,7 @@ export function AvailableServiceProviders({
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0">
                             <p className="font-semibold text-sm truncate">{provider.name}</p>
+                            <RatingBadge listing={provider} className="text-xs" />
                             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                               {provider.category && (
                                 <span className="text-xs bg-secondary px-1.5 py-0.5 rounded-full flex items-center gap-1">

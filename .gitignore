@@ -49,3 +49,9 @@ firestore-debug.log
 service-account.json
 *.local
 .vercel
+
+# local emulator testing
+emulator-data/
+.env.development.local
+ui-debug.log
+firebase-export-*

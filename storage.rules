@@ -2,35 +2,61 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // Rules can't import files, so this list is a copy of functions/src/admin-emails.json.
+    // scripts/test-admin-emails.ts fails if the two differ.
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email in [
+          'maryke@travellingsouthafrica.co.za',
+          'charles@travellingsouthafrica.co.za'
+        ]
+      );
+    }
+
+    // SVGs are deliberately excluded: they can carry scripts.
+    function isAllowedImage() {
+      return request.resource.contentType.matches('image/(png|jpeg|webp)');
+    }
+
+    // Only the admin listing panel uploads here. The limits also block deletes, as before.
     match /listings/{listingId}/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null
+      allow write: if isAdmin()
                    && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && isAllowedImage();
     }
 
+    // Photos from Add Your Listing: any signed-in user, into their own folder only.
     match /submissions/{allPaths=**} {
       allow read: if true;
+    }
+    match /submissions/{collectionName}/{userId}/{fileName} {
       allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.auth.token.firebase.sign_in_provider != 'anonymous'
+                   && collectionName in ['accommodations', 'service_providers', 'restaurants', 'attractions']
                    && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && isAllowedImage();
     }
 
+    // Only the admin towns panel uploads here. The limits also block deletes, as before.
     match /towns/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null
+      allow write: if isAdmin()
                    && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && isAllowedImage();
     }
 
     match /blog-images/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create, update: if isAdmin() && isAllowedImage();
+      allow delete: if isAdmin();
     }
 
     match /events/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create, update: if isAdmin() && isAllowedImage();
+      allow delete: if isAdmin();
     }
 
     match /{allPaths=**} {

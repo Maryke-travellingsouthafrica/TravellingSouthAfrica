@@ -26,7 +26,6 @@ import {
   Mail,
   Globe,
   MapPin,
-  Star,
   ChevronLeft,
   ChevronRight,
   Car,
@@ -42,6 +41,7 @@ import {
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 import { ShareButton } from '@/components/listings/share-button';
 import { ListingDetailsDialog } from '@/components/listings/listing-details-dialog';
+import { RatingBadge } from '@/components/reviews/rating-stars';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getListingPath, getListingUrl } from '@/lib/listing-links';
 
@@ -163,13 +163,7 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
                   </Link>
                 </h3>
               </div>
-              <div className="flex items-center gap-0.5 text-yellow-400 mt-1 shrink-0">
-                  <Star className="h-4 w-4" />
-                  <Star className="h-4 w-4" />
-                  <Star className="h-4 w-4" />
-                  <Star className="h-4 w-4" />
-                  <Star className="h-4 w-4" />
-              </div>
+              <RatingBadge listing={listing} className="mt-1 shrink-0" />
           </div>
 
           {listing.townSlug && (

@@ -1,22 +1,52 @@
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore as adminGetFirestore, FieldValue } from "firebase-admin/firestore";
+import { computeRatingStats, escapeHtml, ratingStatsMatch } from "./review-stats";
+import ADMIN_EMAILS from "./admin-emails.json";
 
 // Initialize Firebase Admin SDK
 initializeApp();
 const adminDb = adminGetFirestore();
 
-const ADMIN_EMAILS = [
-    "maryke@travellingsouthafrica.co.za",
-    "tristan@industrialgrowthhub.com",
-    "charles@travellingsouthafrica.co.za",
-];
-
 const isAdminByEmail = (email?: string) => {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email);
+};
+
+// Recalculates a listing's rating from its approved reviews. Safe to re-run, and
+// does nothing when the listing doesn't exist (e.g. it was un-approved or deleted).
+const recalculateListingRating = async (collectionName: string, listingId: string) => {
+  const listingRef = adminDb.collection(collectionName).doc(listingId);
+  const approvedReviews = adminDb
+    .collection("reviews")
+    .where("listingId", "==", listingId)
+    .where("status", "==", "approved")
+    .select("rating");
+
+  await adminDb.runTransaction(async (transaction) => {
+    const listing = await transaction.get(listingRef);
+    if (!listing.exists) {
+      logger.info(`Listing ${collectionName}/${listingId} not found — rating not updated.`);
+      return;
+    }
+
+    const reviews = await transaction.get(approvedReviews);
+    const stats = computeRatingStats(reviews.docs.map((review) => review.get("rating")));
+    if (ratingStatsMatch(listing.data() ?? {}, stats)) return;
+
+    transaction.update(
+      listingRef,
+      stats.ratingCount > 0
+        ? stats
+        : {
+          ratingAverage: FieldValue.delete(),
+          ratingCount: FieldValue.delete(),
+          ratingBreakdown: FieldValue.delete(),
+        }
+    );
+  });
 };
 
 // Approve a listing submission
@@ -42,6 +72,11 @@ export const approveListing = onCall(async (request) => {
     throw new HttpsError("internal", "Submission data is empty.");
   }
 
+  // Submitters control their submission's fields, so a rating must never be copied across.
+  delete data.ratingAverage;
+  delete data.ratingCount;
+  delete data.ratingBreakdown;
+
   await adminDb.collection(collectionName).doc(submissionId).set({
     ...data,
     approved: true,
@@ -50,6 +85,12 @@ export const approveListing = onCall(async (request) => {
   });
 
   await submissionRef.update({ status: "approved" });
+
+  // Re-approving replaces the public doc, so restore the rating from any existing
+  // reviews. A failure here shouldn't report the approval itself as failed.
+  await recalculateListingRating(collectionName, submissionId).catch((error) => {
+    logger.error(`Rating not restored for ${collectionName}/${submissionId}`, error);
+  });
 
   return { success: true, message: `Listing ${submissionId} approved.` };
 });
@@ -137,6 +178,56 @@ export const onAccommodationsSubmission = defineListingNotification("accommodati
 export const onRestaurantsSubmission = defineListingNotification("restaurants");
 export const onServiceProvidersSubmission = defineListingNotification("service_providers");
 export const onAttractionsSubmission = defineListingNotification("attractions");
+
+const REVIEW_LISTING_COLLECTIONS: Record<string, string> = {
+  accommodation: "accommodations",
+  service_provider: "service_providers",
+  restaurant: "restaurants",
+  attraction: "attractions",
+};
+
+// Keeps a listing's rating in step with its approved reviews, and tells the admins
+// about each new review. Writes only to the listing and `mail`, so it can't re-trigger itself.
+export const onReviewWritten = onDocumentWritten(
+  { document: "reviews/{reviewId}" },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    const review = after ?? before;
+    if (!review) return;
+
+    // Only approved reviews count, so a change that never touched one can't move the rating.
+    if (before?.status === "approved" || after?.status === "approved") {
+      const collectionName = REVIEW_LISTING_COLLECTIONS[review.listingType];
+      if (collectionName) {
+        await recalculateListingRating(collectionName, review.listingId);
+      } else {
+        logger.warn(`Review ${event.params.reviewId} has unknown listing type ${review.listingType}.`);
+      }
+    }
+
+    if (!before && after?.status === "pending") {
+      // Keyed by the event so a redelivered event can't send a second email.
+      await adminDb.collection("mail").doc(`review-${event.id}`).set({
+        to: ADMIN_EMAILS,
+        message: {
+          subject: `New Review: ${review.listingTitle}`,
+          html: `
+            <p>A new review has been submitted and is waiting for approval.</p>
+            <p><strong>Listing:</strong> ${escapeHtml(review.listingTitle)}</p>
+            <p><strong>Rating:</strong> ${escapeHtml(review.rating)} out of 5</p>
+            <p><strong>Reviewer:</strong> ${escapeHtml(review.userName)}</p>
+            <p><strong>Title:</strong> ${escapeHtml(review.title)}</p>
+            <p><strong>Review:</strong> ${escapeHtml(review.body)}</p>
+            <p>Please log in to the admin panel to approve or reject this review.</p>
+          `,
+        },
+      });
+
+      logger.info(`Notification email queued for review ${event.params.reviewId}.`);
+    }
+  }
+);
 
 export const onContactMessageCreate = onDocumentCreated(
   { document: "contactMessages/{messageId}" },

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { login, signInWithGoogle, sendPasswordReset } from "@/firebase/auth/actions";
@@ -16,16 +16,22 @@ import { Translatable } from "@/components/translatable";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "@/components/logo";
 import { Eye, EyeOff } from "lucide-react";
+import { getPostAuthPath, getRedirectFromSearch, withRedirect } from "@/lib/auth-redirect";
 
 // Where to send the user after login: the same-site path in ?redirect= if
 // one was given (e.g. from a "Login Required" card), otherwise the dashboard.
 function getPostLoginPath() {
-  const redirect = new URLSearchParams(window.location.search).get("redirect");
-  const isSameSitePath = !!redirect && redirect.startsWith("/") && !redirect.startsWith("//") && !redirect.startsWith("/\\");
-  return isSameSitePath ? redirect : "/dashboard";
+  return getPostAuthPath(window.location.search);
 }
 
 export default function LoginPage() {
+  // Read after mount because the page is prerendered, where there is no query string.
+  const [signupHref, setSignupHref] = useState("/signup");
+
+  useEffect(() => {
+    setSignupHref(withRedirect("/signup", getRedirectFromSearch(window.location.search)));
+  }, []);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -163,7 +169,7 @@ export default function LoginPage() {
             </Button>
             <div className="mt-4 text-center text-sm">
               <Translatable text="Don't have an account?" />{" "}
-              <Link href="/signup" className="underline">
+              <Link href={signupHref} className="underline">
                 <Translatable text="Sign up" />
               </Link>
             </div>

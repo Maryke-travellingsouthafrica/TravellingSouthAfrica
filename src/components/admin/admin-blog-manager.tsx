@@ -351,7 +351,7 @@ export function AdminBlogManager() {
                   <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-muted-foreground/30 rounded-lg cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png, image/jpeg, image/webp"
                       onChange={handleImageUpload}
                       disabled={uploadingImage}
                       className="hidden"

@@ -11,15 +11,28 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Rules can't import files, so this list is a copy of functions/src/admin-emails.json.
+    // scripts/test-admin-emails.ts fails if the two differ.
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email in [
           'maryke@travellingsouthafrica.co.za',
-          'tristan@industrialgrowthhub.com',
-          'kassoratechnology@gmail.com',
           'charles@travellingsouthafrica.co.za'
         ]
       );
+    }
+
+    // Rating fields on a listing are written only by the Cloud Function (Admin SDK).
+    function ratingFields() {
+      return ['ratingAverage', 'ratingCount', 'ratingBreakdown'];
+    }
+
+    function createsNoRatingFields() {
+      return !request.resource.data.keys().hasAny(ratingFields());
+    }
+
+    function keepsRatingFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(ratingFields());
     }
 
     // 1. Provinces - public read, admin write
@@ -123,10 +136,11 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // 10. Blog Posts - public read for published, authenticated users for drafts and write access
+    // 10. Blog Posts - public read for published, admin read for drafts, admin write.
+    // Public queries must filter on published == true, or they are rejected outright.
     match /blogPosts/{postId} {
-      allow read: if resource.data.published == true || isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read: if resource.data.published == true || isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // 11. Events - public read, admin write
@@ -135,22 +149,101 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 12. Reviews - one per user per listing (doc ID is `${listingId}_${uid}`). Public once approved.
+    // Fields and limits mirror src/lib/reviews.ts.
+    function isReviewer() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function hasValidReviewContent(data) {
+      return data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.title is string && data.title.trim().size() >= 3 && data.title.trim().size() <= 80
+        && data.body is string && data.body.trim().size() >= 20 && data.body.trim().size() <= 2000
+        && (!('visitDate' in data) || (data.visitDate is string && data.visitDate.matches('[0-9]{4}-(0[1-9]|1[0-2])')));
+    }
+
+    function reviewListingPath(data) {
+      let collectionName = {
+        'accommodation': 'accommodations',
+        'service_provider': 'service_providers',
+        'restaurant': 'restaurants',
+        'attraction': 'attractions'
+      }[data.listingType];
+      return /databases/$(database)/documents/$(collectionName)/$(data.listingId);
+    }
+
+    // The listing must be published and not the reviewer's own, and the stored title must be its real name.
+    function canReviewListing(data) {
+      let listing = get(reviewListingPath(data)).data;
+      return listing.get('approved', false) == true
+        && listing.get('name', '') == data.listingTitle
+        && listing.get('submittedBy', '') != request.auth.uid
+        && listing.get('ownerUid', '') != request.auth.uid;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if resource.data.status == 'approved'
+        || isOwner(resource.data.userId)
+        || isAdmin();
+
+      allow create: if isReviewer()
+        && request.resource.data.keys().hasAll(['listingId', 'listingType', 'listingTitle', 'userId', 'userName', 'rating', 'title', 'body', 'status', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['listingId', 'listingType', 'listingTitle', 'userId', 'userName', 'rating', 'title', 'body', 'visitDate', 'status', 'createdAt', 'updatedAt'])
+        && request.resource.data.listingId is string
+        && reviewId == request.resource.data.listingId + '_' + request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.listingType in ['accommodation', 'service_provider', 'restaurant', 'attraction']
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() >= 1 && request.resource.data.userName.size() <= 60
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && hasValidReviewContent(request.resource.data)
+        && canReviewListing(request.resource.data);
+
+      // Authors may rewrite their review, which always sends it back to pending. Admins may only moderate.
+      allow update: if (
+          isReviewer()
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'title', 'body', 'visitDate', 'status', 'updatedAt'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.updatedAt == request.time
+          && hasValidReviewContent(request.resource.data)
+        ) || (
+          isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderatedAt', 'moderatedBy'])
+          && request.resource.data.status in ['pending', 'approved', 'rejected']
+          && request.resource.data.moderatedAt == request.time
+          && request.resource.data.moderatedBy == request.auth.uid
+        );
+
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
     // ---- LEGACY COLLECTIONS (For backward compatibility, public read / admin write) ----
     match /accommodations/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isAdmin() && createsNoRatingFields();
+      allow update: if isAdmin() && keepsRatingFields();
+      allow delete: if isAdmin();
     }
     match /restaurants/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isAdmin() && createsNoRatingFields();
+      allow update: if isAdmin() && keepsRatingFields();
+      allow delete: if isAdmin();
     }
     match /service_providers/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isAdmin() && createsNoRatingFields();
+      allow update: if isAdmin() && keepsRatingFields();
+      allow delete: if isAdmin();
     }
     match /attractions/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isAdmin() && createsNoRatingFields();
+      allow update: if isAdmin() && keepsRatingFields();
+      allow delete: if isAdmin();
     }
 
     match /accommodations_submissions/{docId} {

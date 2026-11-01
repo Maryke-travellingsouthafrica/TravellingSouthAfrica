@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { Translatable } from '@/components/translatable';
+import { RatingBadge } from '@/components/reviews/rating-stars';
 import { sights as staticSights } from '@/lib/data/sights';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
@@ -27,6 +28,8 @@ interface TownSight {
   category?: string;
   description?: string;
   imageUrl?: string;
+  ratingAverage?: number;
+  ratingCount?: number;
 }
 
 export function TownSights({ townSlug, townName }: { townSlug: string; townName: string }) {
@@ -58,6 +61,8 @@ export function TownSights({ townSlug, townName }: { townSlug: string; townName:
             category: data.category,
             description: data.description,
             imageUrl: data.imageUrls?.[0],
+            ratingAverage: data.ratingAverage,
+            ratingCount: data.ratingCount,
           };
         });
 
@@ -126,6 +131,7 @@ export function TownSights({ townSlug, townName }: { townSlug: string; townName:
                     <Badge variant="secondary"><Translatable text={sight.category} /></Badge>
                   )}
                   <h3 className="font-headline text-lg font-bold"><Translatable text={sight.name} /></h3>
+                  <RatingBadge listing={sight} />
                   {sight.description && (
                     <p className="text-sm text-muted-foreground line-clamp-2">{sight.description}</p>
                   )}

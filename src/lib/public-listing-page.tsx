@@ -2,10 +2,37 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ListingDetailView } from '@/components/listings/listing-detail-view';
 import { buildListingSlug, getListingPath, getSiteUrl, type ListingKind } from '@/lib/listing-links';
-import { getPublicListing } from '@/lib/public-listings';
+import { getInitialReviews, getPublicListing, type PublicListing } from '@/lib/public-listings';
+import { buildAggregateRating } from '@/lib/reviews';
 import { towns } from '@/lib/data/towns';
 
 const LOGO_PATH = '/2026%20Logo%20(1)-Photoroom.png';
+
+const REVIEW_LISTING_TYPES = { accommodation: 'accommodation', 'service-provider': 'service_provider' } as const;
+
+/** The business's JSON-LD, only once it has approved reviews to show for it. */
+function buildRatedBusinessSchema(kind: keyof typeof REVIEW_LISTING_TYPES, listing: PublicListing) {
+  const aggregateRating = buildAggregateRating(listing);
+  if (!aggregateRating) return null;
+
+  const image = (listing.imageUrls as string[] | undefined)?.find(Boolean);
+  return {
+    '@context': 'https://schema.org',
+    '@type': kind === 'accommodation' ? 'LodgingBusiness' : 'LocalBusiness',
+    name: listing.name,
+    url: `${getSiteUrl()}${getListingPath(kind, listing)}`,
+    ...(listing.description ? { description: listing.description } : {}),
+    ...(image ? { image } : {}),
+    ...(listing.contactPhone ? { telephone: listing.contactPhone } : {}),
+    address: {
+      '@type': 'PostalAddress',
+      ...(listing.physicalAddress ? { streetAddress: listing.physicalAddress } : {}),
+      ...(getTownName(listing.townSlug) ? { addressLocality: getTownName(listing.townSlug) } : {}),
+      addressCountry: 'ZA',
+    },
+    aggregateRating,
+  };
+}
 
 function getTownName(townSlug?: string) {
   if (!townSlug) return undefined;
@@ -58,13 +85,27 @@ export async function renderListingPage(kind: Exclude<ListingKind, 'event'>, slu
   // Old name in the link (listing renamed): send them to the current URL.
   if (slug !== buildListingSlug(listing.name, listing.id)) permanentRedirect(getListingPath(kind, listing));
 
+  const initialReviewPage = await getInitialReviews(listing.id);
+  const businessSchema = buildRatedBusinessSchema(kind, listing);
+
   return (
-    <ListingDetailView
-      listing={listing as any}
-      townName={getTownName(listing.townSlug)}
-      backHref={kind === 'accommodation' ? '/accommodations' : '/service-providers'}
-      backLabel={kind === 'accommodation' ? 'All accommodation' : 'All service providers'}
-      shareUrl={`${getSiteUrl()}${getListingPath(kind, listing)}`}
-    />
+    <>
+      {businessSchema && (
+        <script
+          type="application/ld+json"
+          // Listing text comes from submissions, so it mustn't be able to close the script tag.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(businessSchema).replace(/</g, '\\u003c') }}
+        />
+      )}
+      <ListingDetailView
+        listing={listing as any}
+        townName={getTownName(listing.townSlug)}
+        backHref={kind === 'accommodation' ? '/accommodations' : '/service-providers'}
+        backLabel={kind === 'accommodation' ? 'All accommodation' : 'All service providers'}
+        shareUrl={`${getSiteUrl()}${getListingPath(kind, listing)}`}
+        reviewListingType={REVIEW_LISTING_TYPES[kind]}
+        initialReviewPage={initialReviewPage}
+      />
+    </>
   );
 }

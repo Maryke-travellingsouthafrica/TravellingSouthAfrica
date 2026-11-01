@@ -16,6 +16,9 @@ import { MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
 import { towns } from "@/lib/data/towns";
 import { getGoogleMapsEmbedUrl } from '@/lib/maps';
+import { ListingReviews } from '@/components/reviews/listing-reviews';
+import { getInitialReviews } from '@/lib/public-listings';
+import { buildAggregateRating } from '@/lib/reviews';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://travellingsouthafrica.co.za';
 
@@ -161,6 +164,9 @@ export default async function SightDetailPage(props: { params: Promise<{ slug: s
       };
 
   const province = provinces.find(p => p.slug === data.provinceSlug);
+  // Only sights backed by a Firestore listing can be reviewed; the static guides aren't listings.
+  const initialReviewPage = firestoreAttraction ? await getInitialReviews(firestoreAttraction.id) : null;
+  const aggregateRating = firestoreAttraction ? buildAggregateRating(firestoreAttraction) : null;
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -200,6 +206,7 @@ export default async function SightDetailPage(props: { params: Promise<{ slug: s
       addressCountry: 'ZA',
     },
     url: `${siteUrl}/sights/${params.slug}`,
+    ...(aggregateRating ? { aggregateRating } : {}),
   };
 
   return (
@@ -275,6 +282,26 @@ export default async function SightDetailPage(props: { params: Promise<{ slug: s
                       referrerPolicy="no-referrer-when-downgrade">
                   </iframe>
               </div>
+          </div>
+        </section>
+      )}
+
+      {firestoreAttraction && initialReviewPage && (
+        <section className="container mx-auto px-4 pb-16">
+          <div className="max-w-4xl mx-auto">
+            <ListingReviews
+              listing={{
+                id: firestoreAttraction.id,
+                name: firestoreAttraction.name,
+                submittedBy: firestoreAttraction.submittedBy,
+                ownerUid: firestoreAttraction.ownerUid,
+                ratingAverage: firestoreAttraction.ratingAverage,
+                ratingCount: firestoreAttraction.ratingCount,
+                ratingBreakdown: firestoreAttraction.ratingBreakdown,
+              }}
+              listingType="attraction"
+              initialPage={initialReviewPage}
+            />
           </div>
         </section>
       )}

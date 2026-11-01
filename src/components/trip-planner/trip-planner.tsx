@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { getListingPath } from '@/lib/listing-links';
 import { Phone, Mail, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GetDirectionsButton, actionRowClass } from '@/components/listings/get-directions-button';
+import { RatingBadge } from '@/components/reviews/rating-stars';
 
 import { provinces } from '@/lib/data/provinces';
 import { towns } from '@/lib/data/towns';
@@ -534,6 +535,7 @@ function AccommodationCard({
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0">
                             <p className="font-semibold text-sm truncate">{accommodation.name}</p>
+                            <RatingBadge listing={accommodation} className="text-xs" />
                             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                               {accommodation.category && (
                                 <span className="text-xs bg-secondary px-1.5 py-0.5 rounded-full">

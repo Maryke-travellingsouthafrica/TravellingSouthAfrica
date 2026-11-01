@@ -9,10 +9,13 @@ import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 import { ShareButton } from '@/components/listings/share-button';
 import { withHttps } from '@/components/listings/listing-card';
+import { ListingReviews } from '@/components/reviews/listing-reviews';
+import { RatingBadge } from '@/components/reviews/rating-stars';
+import type { ListingRatingFields, ReviewListingType, ReviewPage } from '@/lib/reviews';
 import { cn } from '@/lib/utils';
 import { ACTION_BASE, ACTION_GHOST, ACTION_PRIMARY, ACTION_SECONDARY } from '@/components/listings/listing-action-styles';
 
-type DetailListing = {
+type DetailListing = ListingRatingFields & {
   id: string;
   name: string;
   category?: string;
@@ -33,12 +36,16 @@ export function ListingDetailView({
   backHref,
   backLabel,
   shareUrl,
+  reviewListingType,
+  initialReviewPage,
 }: {
   listing: DetailListing;
   townName?: string;
   backHref: string;
   backLabel: string;
   shareUrl: string;
+  reviewListingType: ReviewListingType;
+  initialReviewPage: ReviewPage;
 }) {
   const images = (listing.imageUrls || []).filter(Boolean);
   const [idx, setIdx] = useState(0);
@@ -126,6 +133,7 @@ export function ListingDetailView({
                 )}
               </div>
               <h1 className="text-3xl font-bold font-headline text-primary leading-tight break-words">{listing.name}</h1>
+              <RatingBadge listing={listing} />
             </div>
 
             {listing.description && (
@@ -206,6 +214,10 @@ export function ListingDetailView({
             </div>
           </CardContent>
         </Card>
+
+        <div className="mt-6">
+          <ListingReviews listing={listing} listingType={reviewListingType} initialPage={initialReviewPage} />
+        </div>
       </div>
     </div>
   );

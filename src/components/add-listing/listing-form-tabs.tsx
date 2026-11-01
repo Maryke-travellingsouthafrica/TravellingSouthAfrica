@@ -79,6 +79,10 @@ const attractionSchema = z.object({
 
 type FormSchema = z.infer<typeof accommodationSchema> | z.infer<typeof serviceProviderSchema> | z.infer<typeof attractionSchema>;
 
+// Mirrors storage.rules, so a bad file is caught here rather than failing mid-upload.
+const PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
 // Contact Email is the public address shown on the listing, typed in by hand.
 // It is deliberately not taken from the logged-in account (see ownerEmail).
 const contactEmailField = {
@@ -254,7 +258,11 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files);
+      const selected = Array.from(e.target.files);
+      const files = selected.filter(file => PHOTO_TYPES.includes(file.type) && file.size < MAX_PHOTO_BYTES);
+      if (files.length < selected.length) {
+        toast({ variant: 'destructive', title: 'Some photos were skipped.', description: 'Photos must be PNG, JPG or WEBP, and under 10 MB.' });
+      }
       if (files.length + imagePreviews.length > 6) {
         toast({ variant: 'destructive', title: 'You can upload a maximum of 6 photos.' });
         return;
@@ -357,9 +365,9 @@ function ListingForm({ user, collectionName, formSchema, title, description, fie
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Camera className="w-8 h-8 mb-2 text-muted-foreground" />
                     <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold"><Translatable text="Click to upload" /></span> or drag and drop</p>
-                    <p className="text-xs text-muted-foreground"><Translatable text="PNG, JPG" /></p>
+                    <p className="text-xs text-muted-foreground"><Translatable text="PNG, JPG or WEBP, under 10 MB each" /></p>
                   </div>
-                  <Input id={`${collectionName}-photos`} type="file" className="hidden" multiple accept="image/png, image/jpeg" onChange={handleImageChange} />
+                  <Input id={`${collectionName}-photos`} type="file" className="hidden" multiple accept={PHOTO_TYPES.join(', ')} onChange={handleImageChange} />
                 </label>
               </div>
               {imagePreviews.length > 0 && (

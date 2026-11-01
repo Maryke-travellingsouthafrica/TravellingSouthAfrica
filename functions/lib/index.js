@@ -32,24 +32,53 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onContactMessageCreate = exports.onAttractionsSubmission = exports.onServiceProvidersSubmission = exports.onRestaurantsSubmission = exports.onAccommodationsSubmission = exports.deleteListingSubmission = exports.unapproveListing = exports.approveListing = void 0;
+exports.onContactMessageCreate = exports.onReviewWritten = exports.onAttractionsSubmission = exports.onServiceProvidersSubmission = exports.onRestaurantsSubmission = exports.onAccommodationsSubmission = exports.deleteListingSubmission = exports.unapproveListing = exports.approveListing = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const app_1 = require("firebase-admin/app");
 const firestore_2 = require("firebase-admin/firestore");
+const review_stats_1 = require("./review-stats");
+const admin_emails_json_1 = __importDefault(require("./admin-emails.json"));
 // Initialize Firebase Admin SDK
 (0, app_1.initializeApp)();
 const adminDb = (0, firestore_2.getFirestore)();
-const ADMIN_EMAILS = [
-    "maryke@travellingsouthafrica.co.za",
-    "tristan@industrialgrowthhub.com",
-];
 const isAdminByEmail = (email) => {
     if (!email)
         return false;
-    return ADMIN_EMAILS.includes(email);
+    return admin_emails_json_1.default.includes(email);
+};
+// Recalculates a listing's rating from its approved reviews. Safe to re-run, and
+// does nothing when the listing doesn't exist (e.g. it was un-approved or deleted).
+const recalculateListingRating = async (collectionName, listingId) => {
+    const listingRef = adminDb.collection(collectionName).doc(listingId);
+    const approvedReviews = adminDb
+        .collection("reviews")
+        .where("listingId", "==", listingId)
+        .where("status", "==", "approved")
+        .select("rating");
+    await adminDb.runTransaction(async (transaction) => {
+        const listing = await transaction.get(listingRef);
+        if (!listing.exists) {
+            logger.info(`Listing ${collectionName}/${listingId} not found — rating not updated.`);
+            return;
+        }
+        const reviews = await transaction.get(approvedReviews);
+        const stats = (0, review_stats_1.computeRatingStats)(reviews.docs.map((review) => review.get("rating")));
+        if ((0, review_stats_1.ratingStatsMatch)(listing.data() ?? {}, stats))
+            return;
+        transaction.update(listingRef, stats.ratingCount > 0
+            ? stats
+            : {
+                ratingAverage: firestore_2.FieldValue.delete(),
+                ratingCount: firestore_2.FieldValue.delete(),
+                ratingBreakdown: firestore_2.FieldValue.delete(),
+            });
+    });
 };
 // Approve a listing submission
 exports.approveListing = (0, https_1.onCall)(async (request) => {
@@ -68,6 +97,10 @@ exports.approveListing = (0, https_1.onCall)(async (request) => {
     if (!data) {
         throw new https_1.HttpsError("internal", "Submission data is empty.");
     }
+    // Submitters control their submission's fields, so a rating must never be copied across.
+    delete data.ratingAverage;
+    delete data.ratingCount;
+    delete data.ratingBreakdown;
     await adminDb.collection(collectionName).doc(submissionId).set({
         ...data,
         approved: true,
@@ -75,6 +108,11 @@ exports.approveListing = (0, https_1.onCall)(async (request) => {
         approvedBy: userEmail,
     });
     await submissionRef.update({ status: "approved" });
+    // Re-approving replaces the public doc, so restore the rating from any existing
+    // reviews. A failure here shouldn't report the approval itself as failed.
+    await recalculateListingRating(collectionName, submissionId).catch((error) => {
+        logger.error(`Rating not restored for ${collectionName}/${submissionId}`, error);
+    });
     return { success: true, message: `Listing ${submissionId} approved.` };
 });
 // Unapprove a listing (remove from public collection)
@@ -113,14 +151,14 @@ const defineListingNotification = (collectionName) => {
         const listing = snap.data();
         const listingId = event.params.listingId;
         if (listing.status === "approved" ||
-            (listing.ownerEmail && ADMIN_EMAILS.includes(listing.ownerEmail))) {
+            (listing.ownerEmail && admin_emails_json_1.default.includes(listing.ownerEmail))) {
             logger.info(`Listing ${listingId} submitted by admin — no notification sent.`);
             return;
         }
         const listingType = collectionName
             .replace(/_/g, " ")
             .replace(/\b\w/g, (l) => l.toUpperCase());
-        await sendNotificationEmail(ADMIN_EMAILS, `New Listing Submission: ${listing.name}`, `
+        await sendNotificationEmail(admin_emails_json_1.default, `New Listing Submission: ${listing.name}`, `
           <p>A new <strong>${listingType}</strong> listing has been submitted for review.</p>
           <p><strong>Name:</strong> ${listing.name}</p>
           <p><strong>Town:</strong> ${listing.townSlug || "N/A"}</p>
@@ -134,12 +172,56 @@ exports.onAccommodationsSubmission = defineListingNotification("accommodations")
 exports.onRestaurantsSubmission = defineListingNotification("restaurants");
 exports.onServiceProvidersSubmission = defineListingNotification("service_providers");
 exports.onAttractionsSubmission = defineListingNotification("attractions");
+const REVIEW_LISTING_COLLECTIONS = {
+    accommodation: "accommodations",
+    service_provider: "service_providers",
+    restaurant: "restaurants",
+    attraction: "attractions",
+};
+// Keeps a listing's rating in step with its approved reviews, and tells the admins
+// about each new review. Writes only to the listing and `mail`, so it can't re-trigger itself.
+exports.onReviewWritten = (0, firestore_1.onDocumentWritten)({ document: "reviews/{reviewId}" }, async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    const review = after ?? before;
+    if (!review)
+        return;
+    // Only approved reviews count, so a change that never touched one can't move the rating.
+    if (before?.status === "approved" || after?.status === "approved") {
+        const collectionName = REVIEW_LISTING_COLLECTIONS[review.listingType];
+        if (collectionName) {
+            await recalculateListingRating(collectionName, review.listingId);
+        }
+        else {
+            logger.warn(`Review ${event.params.reviewId} has unknown listing type ${review.listingType}.`);
+        }
+    }
+    if (!before && after?.status === "pending") {
+        // Keyed by the event so a redelivered event can't send a second email.
+        await adminDb.collection("mail").doc(`review-${event.id}`).set({
+            to: admin_emails_json_1.default,
+            message: {
+                subject: `New Review: ${review.listingTitle}`,
+                html: `
+            <p>A new review has been submitted and is waiting for approval.</p>
+            <p><strong>Listing:</strong> ${(0, review_stats_1.escapeHtml)(review.listingTitle)}</p>
+            <p><strong>Rating:</strong> ${(0, review_stats_1.escapeHtml)(review.rating)} out of 5</p>
+            <p><strong>Reviewer:</strong> ${(0, review_stats_1.escapeHtml)(review.userName)}</p>
+            <p><strong>Title:</strong> ${(0, review_stats_1.escapeHtml)(review.title)}</p>
+            <p><strong>Review:</strong> ${(0, review_stats_1.escapeHtml)(review.body)}</p>
+            <p>Please log in to the admin panel to approve or reject this review.</p>
+          `,
+            },
+        });
+        logger.info(`Notification email queued for review ${event.params.reviewId}.`);
+    }
+});
 exports.onContactMessageCreate = (0, firestore_1.onDocumentCreated)({ document: "contactMessages/{messageId}" }, async (event) => {
     const snap = event.data;
     if (!snap)
         return;
     const message = snap.data();
-    await sendNotificationEmail(ADMIN_EMAILS, `New Contact Message from ${message.name}: ${message.subject}`, `
+    await sendNotificationEmail(admin_emails_json_1.default, `New Contact Message from ${message.name}: ${message.subject}`, `
         <p>You have received a new contact message.</p>
         <p><strong>Name:</strong> ${message.name}</p>
         <p><strong>Email:</strong> ${message.email}</p>

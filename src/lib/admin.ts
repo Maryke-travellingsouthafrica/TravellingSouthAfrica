@@ -1,10 +1,7 @@
 import type { User } from 'firebase/auth';
-
-const ADMIN_EMAILS = [
-  'maryke@travellingsouthafrica.co.za',
-  'tristan@industrialgrowthhub.com',
-  'charles@travellingsouthafrica.co.za',
-];
+// The one list of admins, shared with the Cloud Functions. It lives in functions/
+// because only that folder is uploaded when functions deploy.
+import ADMIN_EMAILS from '../../functions/src/admin-emails.json';
 
 export const isAdmin = (user: User | null): boolean => {
   if (!user || !user.email) {

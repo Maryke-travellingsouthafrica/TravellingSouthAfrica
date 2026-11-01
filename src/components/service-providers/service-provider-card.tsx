@@ -15,7 +15,6 @@ export function ServiceProviderCard({ listing }: { listing: any }) {
       <ListingCard
         listing={listing}
         categoryIcon={CategoryIcon}
-        showStars
         detailHref={getListingPath('service-provider', listing)}
         shareUrl={getListingUrl('service-provider', listing)}
         onOpenDetails={() => setOpen(true)}

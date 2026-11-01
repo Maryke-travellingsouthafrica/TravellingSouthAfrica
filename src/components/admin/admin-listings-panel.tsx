@@ -214,7 +214,7 @@ function ManageListingDialog({
               <p className="text-sm text-muted-foreground">No images. Upload some below.</p>
             )}
             <div>
-              <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+              <input ref={fileInputRef} type="file" accept="image/png, image/jpeg, image/webp" multiple className="hidden" onChange={handleImageUpload} />
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                 {isUploading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : <><Plus className="h-4 w-4 mr-2" />Add Images</>}
               </Button>

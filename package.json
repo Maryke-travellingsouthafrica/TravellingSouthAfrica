@@ -7,6 +7,9 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
+    "emulators": "node scripts/emulators.mjs start",
+    "seed": "tsx scripts/seed-emulator.ts",
+    "dev:emulators": "node scripts/emulators.mjs check && next dev --turbopack",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",

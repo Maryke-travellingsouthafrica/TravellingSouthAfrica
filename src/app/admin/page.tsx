@@ -14,6 +14,7 @@ import { SiteTrafficPanel } from '@/components/admin/site-traffic-panel';
 import { AdminTownsPanel } from '@/components/admin/admin-towns-panel';
 import { AdminBlogManager } from '@/components/admin/admin-blog-manager';
 import { AdminEventsManager } from '@/components/admin/admin-events-manager';
+import { AdminReviewsManager } from '@/components/admin/admin-reviews-manager';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -48,7 +49,7 @@ export default function AdminPage() {
         </Button>
       </div>
       <Tabs defaultValue="accommodations" className="mt-8">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-7">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-8">
           <TabsTrigger value="accommodations">Accommodations</TabsTrigger>
           <TabsTrigger value="service_providers">Services</TabsTrigger>
           <TabsTrigger value="attractions">Attractions</TabsTrigger>
@@ -56,6 +57,7 @@ export default function AdminPage() {
           <TabsTrigger value="manage-towns">Manage Towns</TabsTrigger>
           <TabsTrigger value="manage-blog">Blog Posts</TabsTrigger>
           <TabsTrigger value="manage-events">Events</TabsTrigger>
+          <TabsTrigger value="manage-reviews">Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="accommodations">
           <AdminListingsPanel collectionName="accommodations" />
@@ -77,6 +79,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="manage-events">
           <AdminEventsManager />
+        </TabsContent>
+        <TabsContent value="manage-reviews">
+          <AdminReviewsManager />
         </TabsContent>
       </Tabs>
 

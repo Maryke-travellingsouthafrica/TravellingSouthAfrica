@@ -11,6 +11,7 @@ import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 import { ShareButton } from '@/components/listings/share-button';
 import { withHttps } from '@/components/listings/listing-card';
+import { RatingBadge } from '@/components/reviews/rating-stars';
 import { ACTION_BASE, ACTION_GHOST, ACTION_PRIMARY, ACTION_SECONDARY } from '@/components/listings/listing-action-styles';
 import { getListingPath, getListingUrl, type ListingKind } from '@/lib/listing-links';
 import { cn } from '@/lib/utils';
@@ -128,6 +129,8 @@ export function ListingDetailsDialog({
             )}
           </div>
         )}
+
+        <RatingBadge listing={listing} className="mt-2" />
 
         {listing.description && (
           <p className="text-sm text-muted-foreground leading-relaxed mt-4 whitespace-pre-line break-words">

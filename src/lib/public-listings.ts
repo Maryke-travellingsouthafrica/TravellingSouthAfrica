@@ -1,8 +1,9 @@
 import { cache } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 import { getListingIdCandidates, type ListingKind } from '@/lib/listing-links';
+import { REVIEWS_PAGE_SIZE, type ListingRatingFields, type Review, type ReviewPage } from '@/lib/reviews';
 
 /**
  * Server-side reads for the public listing pages (client SDK, same as the existing
@@ -20,7 +21,7 @@ export const LISTING_COLLECTIONS: Record<ListingKind, string> = {
   event: 'events',
 };
 
-export type PublicListing = { id: string; [key: string]: any };
+export type PublicListing = ListingRatingFields & { id: string; [key: string]: any };
 
 function getFirestoreInstance() {
   const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -50,6 +51,26 @@ export const getPublicListing = cache(async (kind: ListingKind, slug: string): P
     return null;
   }
 });
+
+/** The first page of a listing's approved reviews, so they arrive with the page. */
+export async function getInitialReviews(listingId: string): Promise<ReviewPage> {
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(getFirestoreInstance(), 'reviews'),
+        where('listingId', '==', listingId),
+        where('status', '==', 'approved'),
+        orderBy('createdAt', 'desc'),
+        limit(REVIEWS_PAGE_SIZE + 1)
+      )
+    );
+    const reviews = snapshot.docs.map((d) => serialise(d.id, d.data()) as Review);
+    return { reviews: reviews.slice(0, REVIEWS_PAGE_SIZE), hasMore: reviews.length > REVIEWS_PAGE_SIZE };
+  } catch (error) {
+    console.error('Error fetching reviews:', error);
+    return { reviews: [], hasMore: false };
+  }
+}
 
 /** Every published listing of a kind, for the sitemap. */
 export async function getAllPublicListings(kind: ListingKind): Promise<PublicListing[]> {

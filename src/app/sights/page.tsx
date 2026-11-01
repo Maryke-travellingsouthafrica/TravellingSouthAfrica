@@ -11,6 +11,8 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, collection, query, getDocs, Timestamp } from "firebase/firestore";
 import { firebaseConfig } from "@/firebase/config";
 import { towns } from '@/lib/data/towns';
+import { RatingBadge } from '@/components/reviews/rating-stars';
+import type { ListingRatingFields } from '@/lib/reviews';
 
 function slugify(name: string) {
   if (!name) return '';
@@ -24,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://travellingsouthafrica.co.za';
 
-interface Attraction {
+interface Attraction extends ListingRatingFields {
   id: string;
   name: string;
   townSlug: string;
@@ -191,6 +193,7 @@ export default async function SightsPage() {
                                             <div className="absolute bottom-0 left-0 w-full p-4 text-white">
                                                 <Badge variant="secondary"><Translatable text={attraction.category} /></Badge>
                                                 <h2 className="font-headline text-xl font-bold mt-2"><Translatable text={attraction.name} /></h2>
+                                                <RatingBadge listing={attraction} className="mt-1 flex" />
                                                 <p className="flex items-center mt-1">
                                                     <MapPin className="w-4 h-4 mr-1" />
                                                     <Translatable text={locationName} />

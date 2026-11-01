@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signup, signInWithGoogle } from "@/firebase/auth/actions";
@@ -11,13 +11,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Translatable } from "@/components/translatable";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "@/components/logo";
+import { getPostAuthPath, getRedirectFromSearch, withRedirect } from "@/lib/auth-redirect";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Read after mount because the page is prerendered, where there is no query string.
+  const [loginHref, setLoginHref] = useState("/login");
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    setLoginHref(withRedirect("/login", getRedirectFromSearch(window.location.search)));
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +36,7 @@ export default function SignupPage() {
         description: error.message,
       });
     } else {
-      router.push("/dashboard");
+      router.push(getPostAuthPath(window.location.search));
     }
   };
 
@@ -42,7 +49,7 @@ export default function SignupPage() {
             description: error.message,
         });
     } else {
-        router.push('/dashboard');
+        router.push(getPostAuthPath(window.location.search));
     }
   };
 
@@ -114,7 +121,7 @@ export default function SignupPage() {
           </Button>
           <div className="mt-4 text-center text-sm">
             <Translatable text="Already have an account?" />{" "}
-            <Link href="/login" className="underline">
+            <Link href={loginHref} className="underline">
               <Translatable text="Login" />
             </Link>
           </div>

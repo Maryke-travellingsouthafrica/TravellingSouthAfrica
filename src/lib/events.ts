@@ -12,7 +12,7 @@
  * time zone explicitly rather than relying on the runtime's local zone.
  */
 
-const SA_TIME_ZONE = 'Africa/Johannesburg';
+export const SA_TIME_ZONE = 'Africa/Johannesburg';
 
 /**
  * A Firestore Timestamp in any of the shapes it reaches the UI in: the client

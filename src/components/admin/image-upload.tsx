@@ -92,7 +92,7 @@ export function ImageUpload({ label, value, onChange, folder = 'towns' }: ImageU
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept="image/png, image/jpeg, image/webp"
             onChange={handleFileChange}
             disabled={uploading}
             className="hidden"

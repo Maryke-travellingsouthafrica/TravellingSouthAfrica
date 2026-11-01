@@ -11,12 +11,12 @@ import {
   Mail,
   Globe,
   MapPin,
-  Star,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
 import { GetDirectionsButton } from '@/components/listings/get-directions-button';
 import { ShareButton } from '@/components/listings/share-button';
+import { RatingBadge } from '@/components/reviews/rating-stars';
 
 /** Adds https:// to a stored URL that has no scheme, e.g. "www.example.co.za". */
 export function withHttps(url: string) {
@@ -26,8 +26,6 @@ export function withHttps(url: string) {
 type ListingCardProps = {
   listing: any;
   categoryIcon: React.ElementType;
-  /** Decorative 5-star row beside the badge (Service Providers only). */
-  showStars?: boolean;
   /** Prefix https:// onto website URLs stored without a scheme. */
   normalizeWebsiteUrl?: boolean;
   /** Clamp the description to 3 lines so cards in a row stay even. */
@@ -43,7 +41,6 @@ type ListingCardProps = {
 export function ListingCard({
   listing,
   categoryIcon: CategoryIcon,
-  showStars = false,
   normalizeWebsiteUrl = false,
   clampDescription = false,
   onOpenDetails,
@@ -143,15 +140,7 @@ export function ListingCard({
                   )}
                 </h3>
               </div>
-              {showStars && (
-                <div className="flex items-center gap-0.5 text-yellow-400 mt-1 shrink-0">
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                </div>
-              )}
+              <RatingBadge listing={listing} className="mt-1 shrink-0" />
           </div>
 
           {listing.townSlug && (
