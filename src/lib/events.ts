@@ -6,7 +6,13 @@
  * that change only have a single `eventDate` field, so every read here falls
  * back to it — a legacy doc still renders correctly on a detail page and in the
  * admin list until it is backfilled.
+ *
+ * Event dates are South African calendar days. Pages render on a UTC server as
+ * well as in browsers, so every day calculation and formatter here names the
+ * time zone explicitly rather than relying on the runtime's local zone.
  */
+
+const SA_TIME_ZONE = 'Africa/Johannesburg';
 
 /**
  * A Firestore Timestamp in any of the shapes it reaches the UI in: the client
@@ -64,33 +70,35 @@ export function getEventEnd(event: EventDateFields): Date | null {
   return toDate(event.endDate) ?? getEventStart(event);
 }
 
-/** Midnight at the start of the given day, local time. */
-export function startOfDay(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+const saDay = new Intl.DateTimeFormat('en-CA', { timeZone: SA_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+const saTime = new Intl.DateTimeFormat('en-GB', { timeZone: SA_TIME_ZONE, hour: '2-digit', minute: '2-digit', hour12: false });
+
+/** The South African calendar day an instant falls on, as yyyy-MM-dd. */
+export function getSaDateString(date: Date) {
+  return saDay.format(date);
+}
+
+/** Midnight at the start of a yyyy-MM-dd day in South Africa (UTC+2, no DST). */
+export function startOfSaDay(day: string) {
+  return new Date(`${day}T00:00:00+02:00`);
 }
 
 /**
- * The last millisecond of the given day, local time. End dates are stored this
- * way so an event stays listed for the whole of its final day — the public
+ * The last millisecond of a yyyy-MM-dd day in South Africa. End dates are stored
+ * this way so an event stays listed for the whole of its final day — the public
  * query compares endDate against the current instant, not against midnight.
  */
-export function endOfDay(date: Date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+export function endOfSaDay(day: string) {
+  return new Date(`${day}T23:59:59.999+02:00`);
 }
 
 function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  );
+  return getSaDateString(a) === getSaDateString(b);
 }
 
-const fullDate = new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
-const dayAndMonth = new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'long' });
-const monthAndYear = new Intl.DateTimeFormat('en-ZA', { month: 'long', year: 'numeric' });
+const fullDate = new Intl.DateTimeFormat('en-ZA', { timeZone: SA_TIME_ZONE, day: 'numeric', month: 'long', year: 'numeric' });
+const dayAndMonth = new Intl.DateTimeFormat('en-ZA', { timeZone: SA_TIME_ZONE, day: 'numeric', month: 'long' });
+const monthAndYear = new Intl.DateTimeFormat('en-ZA', { timeZone: SA_TIME_ZONE, month: 'long', year: 'numeric' });
 
 /**
  * Formats an event's dates as a single date or a range, collapsing the parts
@@ -108,9 +116,12 @@ export function formatEventDateRange(event: EventDateFields): string | null {
   const end = getEventEnd(event) ?? start;
   if (end < start || isSameDay(start, end)) return fullDate.format(start);
 
-  if (start.getFullYear() === end.getFullYear()) {
-    if (start.getMonth() === end.getMonth()) {
-      return `${start.getDate()}–${end.getDate()} ${monthAndYear.format(end)}`;
+  const startDay = getSaDateString(start); // yyyy-MM-dd
+  const endDay = getSaDateString(end);
+
+  if (startDay.slice(0, 4) === endDay.slice(0, 4)) {
+    if (startDay.slice(0, 7) === endDay.slice(0, 7)) {
+      return `${Number(startDay.slice(8))}–${Number(endDay.slice(8))} ${monthAndYear.format(end)}`;
     }
     return `${dayAndMonth.format(start)} – ${fullDate.format(end)}`;
   }
@@ -118,16 +129,12 @@ export function formatEventDateRange(event: EventDateFields): string | null {
   return `${fullDate.format(start)} – ${fullDate.format(end)}`;
 }
 
-/** True when the event runs over more than one calendar day. */
+/** True when the event runs over more than one South African calendar day. */
 export function isMultiDayEvent(event: EventDateFields) {
   const start = getEventStart(event);
   const end = getEventEnd(event);
   return !!(start && end && !isSameDay(start, end));
 }
-
-const SA_TIME_ZONE = 'Africa/Johannesburg';
-const saDay = new Intl.DateTimeFormat('en-CA', { timeZone: SA_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
-const saTime = new Intl.DateTimeFormat('en-GB', { timeZone: SA_TIME_ZONE, hour: '2-digit', minute: '2-digit', hour12: false });
 
 /**
  * "18:00" when the start carries a real time of day (South African time), else null.

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -12,11 +13,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ImageUpload } from '@/components/admin/image-upload';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 import Image from 'next/image';
 import { Trash2, Edit2, Loader2, ChevronsUpDown, Check, Calendar as CalendarIcon, MapPin } from 'lucide-react';
 import { createEvent, getAllEvents, updateEvent, deleteEvent, type EventDoc } from '@/services/eventsService';
-import { formatEventDateRange, getEventEnd, getEventStart } from '@/lib/events';
+import { formatEventDateRange, getEventEnd, getEventStart, getSaDateString, isMultiDayEvent } from '@/lib/events';
 import { deleteEventImage } from '@/services/storageService';
 import { towns as allTownsData } from '@/lib/data/towns';
 import { ListingShareActions } from '@/components/listings/listing-share-actions';
@@ -25,8 +25,9 @@ import { provinces } from '@/lib/data/provinces';
 interface FormData {
   title: string;
   description: string;
+  isSingleDay: boolean;
   startDate: string; // yyyy-MM-dd, native date input format
-  endDate: string; // same as startDate for a single-day event
+  endDate: string; // ignored while isSingleDay is set
   townSlug: string;
   imageUrl: string;
 }
@@ -34,6 +35,7 @@ interface FormData {
 const initialFormData: FormData = {
   title: '',
   description: '',
+  isSingleDay: true,
   startDate: '',
   endDate: '',
   townSlug: '',
@@ -93,8 +95,9 @@ export function AdminEventsManager() {
       return;
     }
 
-    // A blank end date means a single-day event.
-    const endDateValue = formData.endDate || formData.startDate;
+    // A single-day event ends on the day it starts. So does a multi-day one given
+    // the same date twice, which simply saves as single-day.
+    const endDateValue = formData.isSingleDay ? formData.startDate : formData.endDate || formData.startDate;
 
     if (endDateValue < formData.startDate) {
       toast({
@@ -111,8 +114,8 @@ export function AdminEventsManager() {
       const eventPayload = {
         title: formData.title,
         description: formData.description,
-        startDate: new Date(`${formData.startDate}T00:00:00`),
-        endDate: new Date(`${endDateValue}T00:00:00`),
+        startDate: formData.startDate,
+        endDate: endDateValue,
         ...(formData.townSlug ? { townSlug: formData.townSlug } : {}),
         ...(formData.imageUrl ? { imageUrl: formData.imageUrl } : {}),
       };
@@ -151,8 +154,9 @@ export function AdminEventsManager() {
     setFormData({
       title: event.title,
       description: event.description,
-      startDate: startDate ? format(startDate, 'yyyy-MM-dd') : '',
-      endDate: endDate ? format(endDate, 'yyyy-MM-dd') : '',
+      isSingleDay: !isMultiDayEvent(event),
+      startDate: startDate ? getSaDateString(startDate) : '',
+      endDate: endDate ? getSaDateString(endDate) : '',
       townSlug: event.townSlug || '',
       imageUrl: event.imageUrl || '',
     });
@@ -230,38 +234,55 @@ export function AdminEventsManager() {
               </div>
 
               {/* Event Dates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="event-start-date">Start Date *</Label>
-                  <Input
-                    id="event-start-date"
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="event-single-day"
+                    checked={formData.isSingleDay}
+                    onCheckedChange={(checked) =>
                       setFormData((prev) => ({
                         ...prev,
-                        startDate: e.target.value,
-                        // Keep a single-day event single-day, and never leave the
-                        // end date stranded before the new start date.
-                        endDate: !prev.endDate || prev.endDate < e.target.value ? e.target.value : prev.endDate,
+                        isSingleDay: checked as boolean,
+                        // Going multi-day asks for a real end date rather than
+                        // silently keeping one that matches the start date.
+                        endDate: prev.endDate > prev.startDate ? prev.endDate : '',
                       }))
                     }
-                    required
                   />
+                  <Label htmlFor="event-single-day">Single-day event</Label>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="event-end-date">End Date *</Label>
-                  <Input
-                    id="event-end-date"
-                    type="date"
-                    min={formData.startDate || undefined}
-                    value={formData.endDate}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, endDate: e.target.value }))}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Same as the start date for a one-day event.
-                  </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="event-start-date">Start Date *</Label>
+                    <Input
+                      id="event-start-date"
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          startDate: e.target.value,
+                          // Never leave the end date stranded before the new start date.
+                          endDate: prev.endDate && prev.endDate < e.target.value ? e.target.value : prev.endDate,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                  {!formData.isSingleDay && (
+                    <div className="space-y-2">
+                      <Label htmlFor="event-end-date">End Date *</Label>
+                      <Input
+                        id="event-end-date"
+                        type="date"
+                        min={formData.startDate || undefined}
+                        value={formData.endDate}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, endDate: e.target.value }))}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">Must be after the start date.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 

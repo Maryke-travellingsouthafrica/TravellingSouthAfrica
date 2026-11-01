@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { getEventStart, startOfDay, endOfDay } from '@/lib/events';
+import { getEventStart, startOfSaDay, endOfSaDay } from '@/lib/events';
 
 const { firestore } = initializeFirebase();
 const eventsCollection = collection(firestore, 'events');
@@ -35,21 +35,23 @@ export interface EventDoc {
 export interface EventInput {
   title: string;
   description: string;
-  startDate: Date;
-  /** Same day as startDate for a single-day event. */
-  endDate: Date;
+  /** South African calendar day, yyyy-MM-dd. */
+  startDate: string;
+  /** South African calendar day, yyyy-MM-dd. Same as startDate for a single-day event. */
+  endDate: string;
   townSlug?: string;
   imageUrl?: string;
 }
 
 /**
- * Start dates are stored at the first millisecond of their day and end dates at
- * the last, so an event stays visible for the whole of its final day.
+ * Start dates are stored at the first millisecond of their South African day and
+ * end dates at the last, so an event stays visible for the whole of its final day
+ * and saves the same way whatever time zone the admin's computer is in.
  */
-function toDateRange(startDate: Date, endDate: Date) {
+function toDateRange(startDate: string, endDate: string) {
   return {
-    startDate: Timestamp.fromDate(startOfDay(startDate)),
-    endDate: Timestamp.fromDate(endOfDay(endDate)),
+    startDate: Timestamp.fromDate(startOfSaDay(startDate)),
+    endDate: Timestamp.fromDate(endOfSaDay(endDate)),
   };
 }
 

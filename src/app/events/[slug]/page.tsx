@@ -19,6 +19,7 @@ import {
   getEventTimeLabel,
   getEventEnd,
   getEventStart,
+  getSaDateString,
   slugifyEventTitle,
   type TimestampLike,
 } from '@/lib/events';
@@ -181,8 +182,10 @@ export default async function EventDetailPage(props: { params: Promise<{ slug: s
     name: event.title,
     description: event.description,
     ...(event.imageUrl ? { image: event.imageUrl } : {}),
-    ...(start ? { startDate: start.toISOString() } : {}),
-    ...(end ? { endDate: end.toISOString() } : {}),
+    // Date-only unless a real start time is set: the stored midnight means "no time
+    // set", and as a UTC timestamp it would read as the day before.
+    ...(start ? { startDate: timeLabel ? start.toISOString() : getSaDateString(start) } : {}),
+    ...(end ? { endDate: getSaDateString(end) } : {}),
     ...(townName
       ? {
           location: {
